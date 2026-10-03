@@ -32,6 +32,19 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Fetch submodules if missing
+        run: |
+          if (-not (Test-Path external/SDL/CMakeLists.txt)) {
+            Remove-Item external/SDL -Recurse -Force -ErrorAction SilentlyContinue
+            git clone --depth 1 --branch release-3.4.16 https://github.com/libsdl-org/SDL.git external/SDL
+            if ($LASTEXITCODE -ne 0) { throw 'SDL clone failed' }
+          }
+          if (-not (Test-Path external/FNA/FNA.Core.csproj)) {
+            Remove-Item external/FNA -Recurse -Force -ErrorAction SilentlyContinue
+            git clone --recursive --shallow-submodules --depth 1 https://github.com/FNA-XNA/FNA.git external/FNA
+            if ($LASTEXITCODE -ne 0) { throw 'FNA clone failed' }
+          }
+
       - name: Check required secrets
         run: |
           foreach ($n in 'CELESTE_ZIP_URL', 'FMOD_ZIP_URL') {
@@ -105,7 +118,7 @@ jobs:
       - name: Build native libs
         run: |
           # The submodule commits decide the cache validity: rebuild when they differ from the cached build.
-          $rev = (git ls-tree HEAD external/FNA external/SDL | Out-String).Trim()
+          $rev = ((git -C external/SDL rev-parse HEAD) + ' ' + (git -C external/FNA rev-parse HEAD)).Trim()
           $stamp = 'natives\.submodules'
           if ((Test-Path natives\android-arm64\libSDL3.so) -and (Test-Path $stamp) -and ((Get-Content $stamp -Raw).Trim() -eq $rev)) {
             Write-Host 'Natives up to date (cache hit).'

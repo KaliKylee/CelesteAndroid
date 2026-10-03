@@ -180,10 +180,22 @@ namespace CelesteAndroid
 			progressBox.AddView(progressText, Margins(top: 6));
 			panel.AddView(progressBox, Margins(top: 12));
 
-			var hint = Text("Controller recommended", 12, Color.Argb(150, 255, 255, 255), TypefaceStyle.Normal);
-			var hintParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent,
-				GravityFlags.Bottom | GravityFlags.End) { RightMargin = Dp(28), BottomMargin = Dp(20) };
-			root.AddView(hint, hintParams);
+			// Créditos no canto inferior direito: autor do port + link do Discord.
+			var credits = new LinearLayout(this) { Orientation = Orientation.Vertical };
+			credits.SetGravity(GravityFlags.End);
+			var byline = Text("Port By Kali Kyle", 13, Color.Argb(220, 255, 255, 255), TypefaceStyle.Bold);
+			byline.SetShadowLayer(Dp(4), 0, Dp(1), Color.Argb(180, 0, 0, 0));
+			byline.Gravity = GravityFlags.End;
+			var discord = LinkText("Discord: discord.gg/BMv35jwYn5");
+			discord.SetTextSize(ComplexUnitType.Sp, 13);
+			discord.SetShadowLayer(Dp(4), 0, Dp(1), Color.Argb(180, 0, 0, 0));
+			discord.Gravity = GravityFlags.End;
+			discord.Click += (_, _) => StartActivity(new Intent(Intent.ActionView, Uri.Parse("https://discord.gg/BMv35jwYn5")));
+			credits.AddView(byline);
+			credits.AddView(discord);
+			var creditsParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent,
+				GravityFlags.Bottom | GravityFlags.End) { RightMargin = Dp(28), BottomMargin = Dp(14) };
+			root.AddView(credits, creditsParams);
 
 			return root;
 		}

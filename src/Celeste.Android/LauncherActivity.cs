@@ -183,6 +183,12 @@ namespace CelesteAndroid
 				GravityFlags.Bottom | GravityFlags.End) { RightMargin = Dp(28), BottomMargin = Dp(14) };
 			root.AddView(credits, creditsParams);
 
+			// Editor dos controles de toque (mover e redimensionar). Fica no canto, fora do painel central.
+			var customize = PillButton("Personalizar controles", filled: false);
+			customize.SetTextSize(ComplexUnitType.Sp, 13);
+			customize.Click += (_, _) => StartActivity(new Intent(this, typeof(ControlsEditorActivity)));
+			root.AddView(customize, new FrameLayout.LayoutParams(Dp(196), Dp(38), GravityFlags.Top | GravityFlags.End) { TopMargin = Dp(14), RightMargin = Dp(20) });
+
 			return root;
 		}
 

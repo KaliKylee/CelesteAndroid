@@ -39,6 +39,8 @@ namespace CelesteAndroid
 		public static string PatchedDll(Context context) => Path.Combine(Files(context), "patched", "Celeste.dll");
 		public static string BackgroundPng(Context context) => Path.Combine(Files(context), "background.png");
 		public static string UserDir(Context context) => Path.Combine(Files(context), "userdata");
+		/// <summary>Layout dos controles de toque salvo pelo editor (lido pelo jogo, que roda em outro processo).</summary>
+		public static string TouchLayoutFile(Context context) => Path.Combine(Files(context), "touch_layout.txt");
 
 		public static bool IsInstalled(Context context) =>
 			File.Exists(PatchedDll(context)) && Directory.Exists(Path.Combine(GameDir(context), "Content"));

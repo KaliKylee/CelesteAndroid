@@ -21,6 +21,7 @@ namespace CelesteAndroid
 			AppContext.SetData("CelesteAndroid.Platform", "Android");
 			AppContext.SetData("CelesteAndroid.PrefPath", GameInstaller.UserDir(context));
 			AppContext.SetData("CelesteAndroid.BackgroundPath", GameInstaller.BackgroundPng(context));
+			AppContext.SetData("CelesteAndroid.TouchLayoutPath", GameInstaller.TouchLayoutFile(context));
 
 			// O FNA resolve o Content relativo ao diretório de trabalho no Android.
 			AppContext.SetData("APP_CONTEXT_BASE_DIRECTORY", gameDir + Path.DirectorySeparatorChar);

@@ -24,7 +24,7 @@ namespace CelesteAndroid
 		public static float ButtonSize = 0.17f;       // diâmetro dos botões
 		public static float StickRadius = 0.13f;      // alcance do analógico
 		public static float StickDeadZone = 0.18f;    // fração do alcance ignorada
-		public static float StickGrabRadius = 2.6f;   // área que "pega" o analógico (zona externa), em múltiplos do alcance
+		public static float StickGrabRadius = 2.6f;   // área que "pega" o analógico (zona externa invisível), em múltiplos do alcance
 		public static float StickX = 0.30f;           // posição fixa do centro (x), em múltiplos da altura da tela
 		public static float StickBottom = 0.28f;      // distância do centro até a borda de baixo, em múltiplos da altura
 		public static bool Enabled = true;
@@ -248,9 +248,6 @@ namespace CelesteAndroid
 			float range = screenH * StickRadius;
 			Vector2 knob = baseCenter + stickKnob;
 			float a = stickActive ? Opacity * 1.3f : Opacity;
-			// Zona externa de captura: o dedo pode começar a tocar aqui, fora do aro, e já controla o analógico.
-			if (!stickActive)
-				DrawCircle(ring!, baseCenter, range * StickGrabRadius, Color.White * (Opacity * 0.25f));
 			DrawCircle(ring!, baseCenter, range * 1.1f, Color.White * a);
 			DrawCircle(disc!, knob, range * 0.45f, Color.White * (a * 1.1f));
 

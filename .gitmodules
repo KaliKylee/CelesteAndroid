@@ -1,0 +1,7 @@
+[submodule "external/FNA"]
+	path = external/FNA
+	url = https://github.com/FNA-XNA/FNA.git
+[submodule "external/SDL"]
+	path = external/SDL
+	url = https://github.com/libsdl-org/SDL.git
+	branch = main

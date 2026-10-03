@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<!-- Host de desenvolvimento (M1): roda o Celeste patcheado no Windows, com o mesmo fluxo do app Android. -->
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net10.0</TargetFramework>
+		<PlatformTarget>x64</PlatformTarget>
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+		<SelfContained>false</SelfContained>
+		<RootNamespace>CelesteAndroid.Desktop</RootNamespace>
+		<AssemblyName>CelesteDesktop</AssemblyName>
+	</PropertyGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\..\external\FNA\FNA.Core.csproj" />
+		<ProjectReference Include="..\Steamworks.NET\Steamworks.NET.csproj" />
+		<ProjectReference Include="..\Celeste.Patcher\Celeste.Patcher.csproj" />
+		<ProjectReference Include="..\Celeste.Android.Patches\Celeste.Android.Patches.csproj"
+			ReferenceOutputAssembly="false" OutputItemType="Content" CopyToOutputDirectory="PreserveNewest" />
+	</ItemGroup>
+	<ItemGroup>
+		<!-- fnalibs (SDL3, FNA3D, FAudio) e FMOD 1.10.14 x64 -->
+		<None Include="$(RepoRoot)natives\win-x64\*.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+		<None Include="$(RepoRoot)fmod\libs\win-x64\*.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+	</ItemGroup>
+</Project>

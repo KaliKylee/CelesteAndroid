@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ícone reserva original (montanha com neve), usado quando o build não tem a arte do jogo. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+	android:width="108dp" android:height="108dp"
+	android:viewportWidth="108" android:viewportHeight="108">
+	<path android:fillColor="#B9A6F2" android:pathData="M24,76 L50,34 L58,46 L64,38 L84,76 Z" />
+	<path android:fillColor="#FFFFFF" android:pathData="M50,34 L57.5,46 L53,43 L49,48 L45,42 Z" />
+	<path android:fillColor="#FFFFFF" android:pathData="M64,38 L69,46 L66,44 L63,47 L61,43 Z" />
+	<path android:fillColor="#F2B8D8" android:pathData="M72,28 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+</vector>

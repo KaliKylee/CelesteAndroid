@@ -57,6 +57,10 @@ namespace CelesteAndroid
 			FNALoggerEXT.LogWarn = msg => Log.Warn(LogTag, msg);
 			FNALoggerEXT.LogError = msg => Log.Error(LogTag, msg);
 
+			// Sem este hint o SDL escolhe a orientação ao criar a janela (rotação livre / retrato).
+			// Só paisagem, nos dois sentidos.
+			SDL3.SDL.SDL_SetHint("SDL_ORIENTATIONS", "LandscapeLeft LandscapeRight");
+
 			// "OpenGL" força o driver GLES; o padrão é Vulkan (SDL_GPU).
 			string? driver = Intent?.GetStringExtra(ExtraDriver);
 			if (!string.IsNullOrEmpty(driver))

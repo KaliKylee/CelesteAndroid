@@ -124,7 +124,7 @@ namespace CelesteAndroid
 			logo.SetScaleType(ImageView.ScaleType.FitCenter);
 			panel.AddView(logo, new LinearLayout.LayoutParams(Dp(150), Dp(121)));
 
-			var subtitle = Text("Native Android port", 15, Accent, TypefaceStyle.Normal);
+			var subtitle = Text("Port nativo para Android", 15, Accent, TypefaceStyle.Normal);
 			subtitle.LetterSpacing = 0.06f;
 			subtitle.Gravity = GravityFlags.Center;
 			panel.AddView(subtitle, Margins(top: -4));
@@ -133,18 +133,18 @@ namespace CelesteAndroid
 			status.Gravity = GravityFlags.Center;
 			panel.AddView(status, Margins(top: 10));
 
-			play = PillButton("PLAY", filled: true);
+			play = PillButton("JOGAR", filled: true);
 			play.Click += (_, _) => Play();
 			panel.AddView(play, new LinearLayout.LayoutParams(Dp(260), Dp(50)) { TopMargin = Dp(14) });
 
-			openFolder = PillButton("Open game files", filled: false);
+			openFolder = PillButton("Selecionar arquivos do jogo", filled: false);
 			openFolder.Click += (_, _) => PickFolder();
 			panel.AddView(openFolder, new LinearLayout.LayoutParams(Dp(260), Dp(44)) { TopMargin = Dp(10) });
 
 			links = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-			openZip = LinkText("Import .zip");
+			openZip = LinkText("Importar .zip");
 			openZip.Click += (_, _) => PickZip();
-			importSaves = LinkText("Import saves");
+			importSaves = LinkText("Importar saves");
 			importSaves.Click += (_, _) => StartActivityForResult(new Intent(Intent.ActionOpenDocumentTree), RequestSaves);
 			driverToggle = LinkText("");
 			driverToggle.Click += (_, _) => ToggleDriver();
@@ -196,6 +196,7 @@ namespace CelesteAndroid
 		{
 			var button = new Button(this) { Text = label, StateListAnimator = null };
 			button.SetAllCaps(false);
+			button.SetPadding(Dp(10), 0, Dp(10), 0);
 			button.SetTextSize(ComplexUnitType.Sp, filled ? 18 : 15);
 			button.SetTypeface(Typeface.Create("sans-serif-medium", filled ? TypefaceStyle.Bold : TypefaceStyle.Normal), filled ? TypefaceStyle.Bold : TypefaceStyle.Normal);
 			button.LetterSpacing = filled ? 0.12f : 0.02f;
@@ -272,14 +273,14 @@ namespace CelesteAndroid
 			importSaves.Enabled = !busy;
 			// A tela é baixa (~360dp): durante a instalação a barra de progresso ocupa o lugar dos links.
 			links.Visibility = busy ? ViewStates.Gone : ViewStates.Visible;
-			openFolder.Text = installed ? "Change game files" : "Open game files";
+			openFolder.Text = installed ? "Mudar arquivos do jogo" : "Selecionar arquivos do jogo";
 			if (!busy)
 			{
 				status.Text = installed
-					? "✓  Ready to play"
-					: "Pick the folder of your Celeste PC copy (FNA / \"opengl\" build) or the itch.io .zip.";
+					? "✓  Pronto pra jogar"
+					: "Selecione a pasta da sua cópia do Celeste para PC (FNA, opengl Build ou do itch.io .zip).";
 			}
-			driverToggle.Text = "Graphics: " + (Prefs.GetString(PrefDriver, "") == "OpenGL" ? "OpenGL ES" : "Vulkan");
+			driverToggle.Text = "Gráficos: " + (Prefs.GetString(PrefDriver, "") == "OpenGL" ? "OpenGL ES" : "Vulkan");
 		}
 
 		private void Play()
@@ -323,7 +324,7 @@ namespace CelesteAndroid
 			else if (requestCode == RequestZip)
 				RunInstall(installer => installer.ImportZip(uri));
 			else if (requestCode == RequestSaves)
-				RunJob(installer => $"✓  Imported {installer.ImportSaves(uri)} save file(s)");
+				RunJob(installer => $"✓  {installer.ImportSaves(uri)} arquivo(s) de save importado(s)");
 		}
 
 		/// <summary>Importação do jogo: cópia → patch → fundo.</summary>
@@ -335,7 +336,7 @@ namespace CelesteAndroid
 				installer.Patch();
 				installer.PrepareBackground();
 				RunOnUiThread(LoadArt);
-				return "✓  Game imported! Ready to play";
+				return "✓  Jogo importado! Pronto pra jogar";
 			});
 		}
 
@@ -369,7 +370,7 @@ namespace CelesteAndroid
 				catch (Exception e)
 				{
 					Log.Error(GameActivity.LogTag, e.ToString());
-					error = "Something went wrong: " + e.Message;
+					error = "Algo deu errado: " + e.Message;
 				}
 
 				RunOnUiThread(() =>

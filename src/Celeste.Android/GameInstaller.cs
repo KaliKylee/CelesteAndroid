@@ -52,12 +52,12 @@ namespace CelesteAndroid
 		/// <summary>Pasta escolhida pelo usuário (ACTION_OPEN_DOCUMENT_TREE).</summary>
 		public void ImportFolder(Uri treeUri)
 		{
-			progress("Looking for Celeste in the folder…", -1);
+			progress("Procurando por Celeste na pasta…", -1);
 			ContentResolver resolver = context.ContentResolver!;
 			string rootId = DocumentsContract.GetTreeDocumentId(treeUri)!;
 
 			Doc root = FindGameRoot(treeUri, new Doc(rootId, "", true, 0), depth: 3)
-				?? throw new InstallException("Couldn't find Celeste.exe and the Content folder there.");
+				?? throw new InstallException("Não encontrei o Celeste.exe e a pasta Content aí.");
 			List<Doc> top = ListChildren(treeUri, root.Id);
 			CheckFnaBuild(top.Any(d => d.Name.Equals("FNA.dll", StringComparison.OrdinalIgnoreCase)));
 
@@ -72,16 +72,16 @@ namespace CelesteAndroid
 		/// <summary>.zip escolhido pelo usuário (ex.: o zip Linux do itch.io).</summary>
 		public void ImportZip(Uri zipUri)
 		{
-			progress("Reading the .zip…", -1);
+			progress("Lendo o .zip…", -1);
 			using var pfd = context.ContentResolver!.OpenFileDescriptor(zipUri, "r")
-				?? throw new InstallException("Couldn't open the file.");
+				?? throw new InstallException("Não consegui abrir o arquivo.");
 			using var stream = new FileStream(new SafeFileHandle(pfd.DetachFd(), ownsHandle: true), FileAccess.Read);
 			using var zip = new ZipArchive(stream, ZipArchiveMode.Read);
 
 			ZipArchiveEntry exe = zip.Entries
 				.Where(e => e.Name.Equals("Celeste.exe", StringComparison.OrdinalIgnoreCase))
 				.OrderBy(e => e.FullName.Length)
-				.FirstOrDefault() ?? throw new InstallException("This .zip doesn't contain Celeste.exe.");
+				.FirstOrDefault() ?? throw new InstallException("Este .zip não contém o Celeste.exe.");
 			string prefix = exe.FullName[..^exe.Name.Length];
 			CheckFnaBuild(zip.GetEntry(prefix + "FNA.dll") != null);
 
@@ -94,7 +94,7 @@ namespace CelesteAndroid
 		/// <summary>APK pessoal: copia o jogo embutido nos assets.</summary>
 		public void ImportEmbedded()
 		{
-			progress("Preparing the bundled game…", -1);
+			progress("Preparando o jogo incluído…", -1);
 			var files = new List<string>();
 			CollectAssets(GameAssetsRoot, files);
 			CopyAll(files.Select(f => (f[(GameAssetsRoot.Length + 1)..], -1L, (Func<Stream>)(() => context.Assets!.Open(f)))));
@@ -106,7 +106,7 @@ namespace CelesteAndroid
 		/// </summary>
 		public int ImportSaves(Uri treeUri)
 		{
-			progress("Looking for save files…", -1);
+			progress("Procurando arquivos de save…", -1);
 			string rootId = DocumentsContract.GetTreeDocumentId(treeUri)!;
 			List<Doc> files = ListChildren(treeUri, rootId);
 			Doc? savesDir = files.FirstOrDefault(d => d.IsDir && d.Name.Equals("Saves", StringComparison.OrdinalIgnoreCase));
@@ -114,7 +114,7 @@ namespace CelesteAndroid
 				files = ListChildren(treeUri, dir.Id);
 			List<Doc> saves = files.Where(d => !d.IsDir && d.Name.EndsWith(".celeste", StringComparison.OrdinalIgnoreCase)).ToList();
 			if (saves.Count == 0)
-				throw new InstallException("No .celeste save files in that folder.");
+				throw new InstallException("Nenhum arquivo de save .celeste nessa pasta.");
 
 			string target = Path.Combine(UserDir(context), "Celeste", "Saves");
 			string backup = Path.Combine(UserDir(context), "Celeste", "Backups");
@@ -137,8 +137,8 @@ namespace CelesteAndroid
 			if (!hasFna)
 			{
 				throw new InstallException(
-					"This is the XNA version of Celeste. On Steam, enable the \"opengl\" beta " +
-					"(Properties → Betas) and copy the folder again, or use the Linux .zip from itch.io.");
+					"Esta é a versão XNA do Celeste. Na Steam, ative o beta \"opengl\" " +
+					"(Propriedades → Betas) e copie a pasta de novo, ou use o .zip do Linux do itch.io.");
 			}
 		}
 
@@ -170,11 +170,11 @@ namespace CelesteAndroid
 				// Sem tamanho conhecido (assets), o progresso segue a contagem de arquivos.
 				float fraction = size >= 0 ? done / (float)total : (i + 1) / (float)files.Count;
 				if (i % 8 == 0 || i == files.Count - 1)
-					progress($"Copying game files… {i + 1}/{files.Count}", fraction);
+					progress($"Copiando arquivos do jogo… {i + 1}/{files.Count}", fraction);
 			}
 
 			if (!File.Exists(Path.Combine(staging, "Celeste.exe")) || !Directory.Exists(Path.Combine(staging, "Content")))
-				throw new InstallException("The copy is incomplete.");
+				throw new InstallException("A cópia está incompleta.");
 
 			string gameDir = GameDir(context);
 			if (Directory.Exists(gameDir))
@@ -189,7 +189,7 @@ namespace CelesteAndroid
 		/// <summary>Gera o Celeste.dll que roda no .NET do Android (MonoMod, no próprio aparelho).</summary>
 		public void Patch()
 		{
-			progress("Adapting the game for Android…", -1);
+			progress("Adaptando o jogo para Android…", -1);
 			string patcherDir = Path.Combine(context.CacheDir!.AbsolutePath, "patcher");
 			Directory.CreateDirectory(patcherDir);
 			foreach (string asset in context.Assets!.List("patcher")!)
@@ -220,7 +220,7 @@ namespace CelesteAndroid
 			string art = Path.Combine(GameDir(context), "Content", "Graphics", "SplashScreen.png");
 			if (!File.Exists(art))
 				return;
-			progress("Generating the background…", -1);
+			progress("Gerando o fundo…", -1);
 
 			const int width = 192, height = 108;
 			using Bitmap decoded = BitmapFactory.DecodeFile(art, new BitmapFactory.Options { InSampleSize = 8 })!;

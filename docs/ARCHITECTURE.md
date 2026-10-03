@@ -98,7 +98,9 @@ MonoMod (and Mono.Cecil) run inside the launcher. The things that were needed:
 2. `GamePadShim` relinks Celeste's calls to `GamePad.GetState(...)` and returns a synthetic `GamePadState` (stick, A, X+B, trigger, Start, D-pad derived from the stick for menus). A real controller, when connected, takes priority and hides the overlay.
 3. `patch_Engine.RenderCore` calls `TouchControls.Draw` after the scene, drawing the overlay with a `SpriteBatch`.
 
-Mapping: floating stick on the left 45% of the screen; right side Jump → A, Dash → X+B, Grab → right trigger, top-right Pause → Start. Tunables are the static fields at the top of the class.
+Mapping: fixed stick at the bottom-left (the base never moves; touches in a wider outer zone around it also grab the stick); right side Jump → A, Dash → X+B, Grab → right trigger, top-right Pause → Start. Tunables are the static fields at the top of the class.
+
+Layout editor: the launcher's "Personalizar controles" button opens `ControlsEditorActivity`, where each control can be dragged and resized. The result is saved as fractions of the screen in `files/touch_layout.txt` (lines `name=x,y,scale`); `TouchControls` reads it on startup via `HostConfig.TouchLayoutPath`, and no file means the default layout. Default positions are duplicated in `ControlsCanvas.SetDefaults` and `TouchControls.Center`/`StickBase` and must be kept in sync.
 
 ## Roadmap
 

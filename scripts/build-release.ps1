@@ -16,7 +16,8 @@ $root = Split-Path $PSScriptRoot -Parent
 $project = Join-Path $root 'src\Celeste.Android\Celeste.Android.csproj'
 $out = Join-Path $root 'out'
 New-Item -ItemType Directory -Force $out | Out-Null
-foreach ($k in 'JAVA_HOME', 'ANDROID_HOME', 'ANDROID_NDK_HOME') { Set-Item "env:$k" ([Environment]::GetEnvironmentVariable($k, 'User')) }
+# User-level value wins if set; otherwise keep the process value (CI runners have no User-level variables).
+foreach ($k in 'JAVA_HOME', 'ANDROID_HOME', 'ANDROID_NDK_HOME') { $v = [Environment]::GetEnvironmentVariable($k, 'User'); if ($v) { Set-Item "env:$k" $v } }
 
 $version = ([xml](Get-Content $project)).Project.PropertyGroup.ApplicationDisplayVersion | Where-Object { $_ } | Select-Object -First 1
 

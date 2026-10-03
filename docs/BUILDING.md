@@ -90,3 +90,15 @@ adb shell am start -n org.celesteandroid.celeste/.LauncherActivity --ez repatch 
 ```
 
 To force OpenGL ES: `--es driver OpenGL` on `GameActivity`, or the *Graphics* toggle in the launcher.
+
+## 8. Building in GitHub Actions
+
+`.github/workflows/build-apk.yml` builds the **public** APK (run it from the *Actions* tab, or push a `v*` tag to also attach the APK to a release). Celeste.exe and FMOD are proprietary, so they are downloaded from private links stored as repository secrets:
+
+| Secret | What |
+|---|---|
+| `CELESTE_ZIP_URL` | Direct link to a `.zip` (or the bare `Celeste.exe`) of your FNA build. Only `Celeste.exe` is used. |
+| `FMOD_ZIP_URL` | Direct link to a `.zip` with `libfmod.so`, `libfmodstudio.so` (arm64-v8a) and `fmod.jar` from FMOD 1.10.14. The official Android package zip also works. |
+| `KEYSTORE_BASE64`, `KEYSTORE_ALIAS`, `KEYSTORE_PASSWORD` | *(optional)* release keystore (`base64 -w0 my.keystore`). Without it the debug key is used. |
+
+The workflow caches the native libs (SDL3, FNA3D, FAudio), so only the first run (or a submodule update) pays for the CMake build.

@@ -64,8 +64,8 @@ namespace CelesteAndroid
 
 			// "Splash": a arte aparece sozinha e o painel entra logo depois.
 			panel.Alpha = 0f;
-			panel.TranslationX = -Dp(32);
-			panel.Animate()!.Alpha(1f).TranslationX(0f).SetStartDelay(650).SetDuration(550)
+			panel.TranslationY = Dp(24);
+			panel.Animate()!.Alpha(1f).TranslationY(0f).SetStartDelay(650).SetDuration(550)
 				.SetInterpolator(new DecelerateInterpolator(2f))!.Start();
 
 			var zoom = new ScaleAnimation(1f, 1.08f, 1f, 1.08f, Dimension.RelativeToSelf, 0.5f, Dimension.RelativeToSelf, 0.4f)
@@ -109,44 +109,28 @@ namespace CelesteAndroid
 			art.SetScaleType(ImageView.ScaleType.CenterCrop);
 			root.AddView(art, Match());
 
-			var shade = new View(this)
-			{
-				Background = new GradientDrawable(GradientDrawable.Orientation.LeftRight!, new int[]
-				{
-					Color.Argb(245, 18, 12, 34), Color.Argb(190, 18, 12, 34), Color.Argb(40, 18, 12, 34), Color.Argb(0, 0, 0, 0),
-				}),
-			};
+			// Escurece a arte por igual, para o texto e os botões (no centro) ficarem legíveis.
+			var shade = new View(this) { Background = new ColorDrawable(Color.Argb(130, 18, 12, 34)) };
 			root.AddView(shade, Match());
 
 			panel = new LinearLayout(this) { Orientation = Orientation.Vertical };
-			panel.SetGravity(GravityFlags.CenterVertical | GravityFlags.Start);
-			panel.SetPadding(Dp(56), Dp(12), Dp(24), Dp(12));
-			root.AddView(panel, new FrameLayout.LayoutParams(Dp(460), ViewGroup.LayoutParams.MatchParent));
+			panel.SetGravity(GravityFlags.Center);
+			panel.SetPadding(Dp(24), Dp(12), Dp(24), Dp(12));
+			root.AddView(panel, new FrameLayout.LayoutParams(Dp(460), ViewGroup.LayoutParams.MatchParent, GravityFlags.Center));
 
-			// Logo do jogo (art/logo.png → GameArt) ou, sem ele, o nome em texto.
-			int logoId = Resources!.GetIdentifier("celeste_logo", "drawable", PackageName);
-			if (logoId != 0)
-			{
-				var logo = new ImageView(this);
-				logo.SetImageResource(logoId);
-				logo.SetAdjustViewBounds(true);
-				logo.SetScaleType(ImageView.ScaleType.FitStart);
-				logo.Elevation = Dp(6);
-				panel.AddView(logo, new LinearLayout.LayoutParams(Dp(150), Dp(118)) { LeftMargin = -Dp(4) });
-			}
-			else
-			{
-				var title = Text("CELESTE", 54, Color.White, TypefaceStyle.Bold);
-				title.LetterSpacing = 0.18f;
-				title.SetShadowLayer(Dp(12), 0, Dp(2), Color.Argb(160, 0, 0, 0));
-				panel.AddView(title);
-			}
+			// Logo: Resources/drawable-nodpi/launcher_logo.png
+			var logo = new ImageView(this);
+			logo.SetImageResource(Resource.Drawable.launcher_logo);
+			logo.SetScaleType(ImageView.ScaleType.FitCenter);
+			panel.AddView(logo, new LinearLayout.LayoutParams(Dp(150), Dp(121)));
 
 			var subtitle = Text("Native Android port", 15, Accent, TypefaceStyle.Normal);
 			subtitle.LetterSpacing = 0.06f;
+			subtitle.Gravity = GravityFlags.Center;
 			panel.AddView(subtitle, Margins(top: -4));
 
 			status = Text("", 14, Color.Argb(220, 255, 255, 255), TypefaceStyle.Normal);
+			status.Gravity = GravityFlags.Center;
 			panel.AddView(status, Margins(top: 10));
 
 			play = PillButton("PLAY", filled: true);
@@ -169,13 +153,15 @@ namespace CelesteAndroid
 			links.AddView(importSaves);
 			links.AddView(Text("·", 14, Color.Argb(120, 255, 255, 255), TypefaceStyle.Normal), Margins(left: 10, right: 10));
 			links.AddView(driverToggle);
-			panel.AddView(links, Margins(top: 6, left: 6));
+			panel.AddView(links, Margins(top: 6));
 
 			progressBox = new LinearLayout(this) { Orientation = Orientation.Vertical, Visibility = ViewStates.Gone };
+			progressBox.SetGravity(GravityFlags.CenterHorizontal);
 			progressBar = new ProgressBar(this, null, Android.Resource.Attribute.ProgressBarStyleHorizontal) { Max = 1000 };
 			progressBar.ProgressTintList = Android.Content.Res.ColorStateList.ValueOf(Accent);
 			progressBar.IndeterminateTintList = Android.Content.Res.ColorStateList.ValueOf(Accent);
 			progressText = Text("", 13, Color.Argb(210, 255, 255, 255), TypefaceStyle.Normal);
+			progressText.Gravity = GravityFlags.Center;
 			progressBox.AddView(progressBar, new LinearLayout.LayoutParams(Dp(260), Dp(8)));
 			progressBox.AddView(progressText, Margins(top: 6));
 			panel.AddView(progressBox, Margins(top: 12));
@@ -202,17 +188,8 @@ namespace CelesteAndroid
 
 		private void LoadArt()
 		{
-			// Arte embutida no build (GameArt/) ou, na versão compartilhável, a key art do jogo importado.
-			if (Resources!.GetIdentifier("celeste_art", "drawable", PackageName) != 0)
-			{
-				art.SetImageResource(Resource.Drawable.launcher_art);
-				return;
-			}
-			string imported = System.IO.Path.Combine(GameInstaller.GameDir(this), "Content", "Graphics", "SplashScreen.png");
-			if (File.Exists(imported))
-				art.SetImageBitmap(BitmapFactory.DecodeFile(imported, new BitmapFactory.Options { InSampleSize = 2 }));
-			else
-				art.SetImageResource(Resource.Drawable.launcher_art);
+			// Fundo da tela inicial: Resources/drawable-nodpi/launcher_bg.jpg
+			art.SetImageResource(Resource.Drawable.launcher_bg);
 		}
 
 		private Button PillButton(string label, bool filled)

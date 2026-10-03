@@ -24,7 +24,9 @@ namespace CelesteAndroid
 		public static float ButtonSize = 0.17f;       // diâmetro dos botões
 		public static float StickRadius = 0.13f;      // alcance do analógico
 		public static float StickDeadZone = 0.18f;    // fração do alcance ignorada
-		public static float StickZoneWidth = 0.45f;   // parte esquerda da tela onde o analógico nasce
+		public static float StickGrabRadius = 1.8f;   // área que "pega" o analógico, em múltiplos do alcance
+		public static float StickX = 0.30f;           // posição fixa do centro (x), em múltiplos da altura da tela
+		public static float StickBottom = 0.28f;      // distância do centro até a borda de baixo, em múltiplos da altura
 		public static bool Enabled = true;
 
 		private enum Btn { Jump, Dash, Grab, Pause }
@@ -42,7 +44,6 @@ namespace CelesteAndroid
 
 		private static bool stickActive;
 		private static long stickKey;
-		private static Vector2 stickOrigin;
 		private static Vector2 stickValue; // -1..1, Y para cima positivo (convenção do gamepad)
 
 		private static int screenW = 1920, screenH = 1080;
@@ -97,6 +98,9 @@ namespace CelesteAndroid
 
 		// ---- Layout ----
 		private static float Unit => screenH * ButtonSize;
+
+		// Analógico fixo: o centro nunca se move, só o botão interno acompanha o dedo.
+		private static Vector2 StickBase => new Vector2(screenH * StickX, screenH * (1f - StickBottom));
 
 		private static Vector2 Center(Btn b)
 		{
@@ -156,12 +160,11 @@ namespace CelesteAndroid
 				{
 					pressed[(int)b] = true;
 				}
-				else if (!stickActive && f.Pos.X < screenW * StickZoneWidth)
+				else if (!stickActive && Vector2.Distance(f.Pos, StickBase) <= screenH * StickRadius * StickGrabRadius)
 				{
 					stickActive = true;
 					stickKey = f.Key;
-					stickOrigin = f.Pos;
-					stickValue = Vector2.Zero;
+					UpdateStick(f.Pos);
 				}
 			}
 		}
@@ -169,15 +172,9 @@ namespace CelesteAndroid
 		private static void UpdateStick(Vector2 pos)
 		{
 			float range = screenH * StickRadius;
-			Vector2 delta = pos - stickOrigin;
-			float len = delta.Length();
-			if (len > range)
-			{
-				// Arrasta a base junto, para o polegar não "estourar" o alcance e o controle ficar sempre do lado do dedo.
-				stickOrigin += delta / len * (len - range);
-				delta = pos - stickOrigin;
-				len = range;
-			}
+			Vector2 delta = pos - StickBase;
+			float dist = delta.Length();
+			float len = Math.Min(dist, range); // passou do alcance: o valor trava no máximo, a base não sai do lugar
 			float amount = len / range;
 			if (amount < StickDeadZone)
 			{
@@ -185,7 +182,7 @@ namespace CelesteAndroid
 				return;
 			}
 			amount = (amount - StickDeadZone) / (1f - StickDeadZone);
-			Vector2 dir = delta / Math.Max(len, 0.0001f);
+			Vector2 dir = delta / Math.Max(dist, 0.0001f);
 			stickValue = new Vector2(dir.X * amount, -dir.Y * amount);
 		}
 
@@ -242,13 +239,13 @@ namespace CelesteAndroid
 			device.Viewport = new Viewport(0, 0, screenW, screenH);
 			batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp, null, null);
 
-			// Analógico: base onde o dedo tocou (ou posição de descanso, discreta, quando solto).
-			Vector2 baseCenter = stickActive ? stickOrigin : new Vector2(screenW * 0.13f, screenH * 0.72f);
+			// Analógico fixo no canto inferior esquerdo.
+			Vector2 baseCenter = StickBase;
 			float range = screenH * StickRadius;
 			Vector2 knob = baseCenter + new Vector2(stickValue.X, -stickValue.Y) * range;
-			float a = stickActive ? Opacity : Opacity * 0.5f;
+			float a = stickActive ? Opacity * 1.3f : Opacity;
 			DrawCircle(ring!, baseCenter, range * 1.1f, Color.White * a);
-			DrawCircle(disc!, knob, range * 0.45f, Color.White * (a * (stickActive ? 1.2f : 0.8f)));
+			DrawCircle(disc!, knob, range * 0.45f, Color.White * (a * 1.1f));
 
 			DrawButton(Btn.Jump, new Color(120, 220, 140), 'A');
 			DrawButton(Btn.Dash, new Color(240, 120, 150), 'X');

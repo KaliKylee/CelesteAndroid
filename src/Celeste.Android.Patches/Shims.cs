@@ -13,11 +13,15 @@ namespace CelesteAndroid
 		public const string PlatformKey = "CelesteAndroid.Platform";
 		public const string PrefPathKey = "CelesteAndroid.PrefPath";
 		public const string BackgroundPathKey = "CelesteAndroid.BackgroundPath";
+		public const string TouchLayoutPathKey = "CelesteAndroid.TouchLayoutPath";
 
 		public static string Platform => AppContext.GetData(PlatformKey) as string ?? "Android";
 
 		/// <summary>Imagem para as faixas laterais em telas mais largas que 16:9 (opcional).</summary>
 		public static string? BackgroundPath => AppContext.GetData(BackgroundPathKey) as string;
+
+		/// <summary>Arquivo com o layout personalizado dos controles de toque (opcional; ver ControlsEditorActivity).</summary>
+		public static string? TouchLayoutPath => AppContext.GetData(TouchLayoutPathKey) as string;
 
 		public static string PrefPath => AppContext.GetData(PrefPathKey) as string
 			?? throw new InvalidOperationException($"{PrefPathKey} não foi definido pelo host.");

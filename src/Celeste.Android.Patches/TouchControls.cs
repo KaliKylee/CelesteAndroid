@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
+using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Microsoft.Xna.Framework;
@@ -63,6 +65,8 @@ namespace CelesteAndroid
 		/// <summary>Chamado a cada GetState; refaz a leitura no máximo 1x por ~4 ms.</summary>
 		private static void Poll()
 		{
+			if (!layoutLoaded)
+				LoadLayout();
 			long now = clock.ElapsedMilliseconds;
 			if (now - lastPollMs < 4)
 				return;
@@ -97,15 +101,62 @@ namespace CelesteAndroid
 			Resolve();
 		}
 
-		// ---- Layout ----
-		private static float Unit => screenH * ButtonSize;
+		// ---- Layout: padrão + personalização salva pelo editor (ControlsEditorActivity) ----
+		// Índices 0..3 = Btn (Jump, Dash, Grab, Pause); 4 = analógico.
+		private const int StickIdx = 4;
+		private static readonly bool[] custom = new bool[5];
+		private static readonly Vector2[] customPos = new Vector2[5]; // centro, em frações da largura/altura da tela
+		private static readonly float[] customScale = { 1f, 1f, 1f, 1f, 1f };
+		private static bool layoutLoaded;
 
-		// Analógico fixo: o centro nunca se move, só o botão interno acompanha o dedo.
-		private static Vector2 StickBase => new Vector2(screenH * StickX, screenH * (1f - StickBottom));
+		/// <summary>Lê touch_layout.txt (linhas "nome=x,y,escala"); sem arquivo, vale o layout padrão.</summary>
+		private static void LoadLayout()
+		{
+			layoutLoaded = true;
+			try
+			{
+				string? path = HostConfig.TouchLayoutPath;
+				if (path == null || !File.Exists(path))
+					return;
+				foreach (string line in File.ReadAllLines(path))
+				{
+					string[] kv = line.Split('=');
+					if (kv.Length != 2)
+						continue;
+					int idx = kv[0].Trim() switch { "jump" => 0, "dash" => 1, "grab" => 2, "pause" => 3, "stick" => 4, _ => -1 };
+					string[] v = kv[1].Split(',');
+					if (idx < 0 || v.Length != 3)
+						continue;
+					if (!float.TryParse(v[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float x)
+						|| !float.TryParse(v[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float y)
+						|| !float.TryParse(v[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float sc))
+						continue;
+					custom[idx] = true;
+					customPos[idx] = new Vector2(Math.Clamp(x, 0f, 1f), Math.Clamp(y, 0f, 1f));
+					customScale[idx] = Math.Clamp(sc, 0.4f, 2.5f);
+				}
+			}
+			catch (Exception)
+			{
+				// Arquivo ilegível: segue com o layout padrão.
+			}
+		}
 
+		private static float BaseUnit => screenH * ButtonSize;
+		private static float Unit(Btn b) => BaseUnit * customScale[(int)b];
+		private static float StickRange => screenH * StickRadius * customScale[StickIdx];
+
+		// Analógico fixo: o centro nunca se move durante o jogo, só o botão interno acompanha o dedo.
+		private static Vector2 StickBase => custom[StickIdx]
+			? new Vector2(customPos[StickIdx].X * screenW, customPos[StickIdx].Y * screenH)
+			: new Vector2(screenH * StickX, screenH * (1f - StickBottom));
+
+		// Padrão: manter em sincronia com ControlsCanvas.SetDefaults (Celeste.Android).
 		private static Vector2 Center(Btn b)
 		{
-			float u = Unit;
+			if (custom[(int)b])
+				return new Vector2(customPos[(int)b].X * screenW, customPos[(int)b].Y * screenH);
+			float u = BaseUnit;
 			return b switch
 			{
 				Btn.Jump => new Vector2(screenW - 1.15f * u, screenH - 1.35f * u),
@@ -116,7 +167,7 @@ namespace CelesteAndroid
 			};
 		}
 
-		private static float Radius(Btn b) => (b == Btn.Pause ? 0.32f : 0.5f) * Unit;
+		private static float Radius(Btn b) => (b == Btn.Pause ? 0.32f : 0.5f) * Unit(b);
 
 		private static bool InsideButton(Vector2 p, out Btn which)
 		{
@@ -162,7 +213,7 @@ namespace CelesteAndroid
 				{
 					pressed[(int)b] = true;
 				}
-				else if (!stickActive && Vector2.Distance(f.Pos, StickBase) <= screenH * StickRadius * StickGrabRadius)
+				else if (!stickActive && Vector2.Distance(f.Pos, StickBase) <= StickRange * StickGrabRadius)
 				{
 					stickActive = true;
 					stickKey = f.Key;
@@ -173,7 +224,7 @@ namespace CelesteAndroid
 
 		private static void UpdateStick(Vector2 pos)
 		{
-			float range = screenH * StickRadius;
+			float range = StickRange;
 			Vector2 delta = pos - StickBase;
 			float dist = delta.Length();
 			float len = Math.Min(dist, range); // passou do alcance: o valor trava no máximo, a base não sai do lugar
@@ -227,6 +278,8 @@ namespace CelesteAndroid
 			PresentationParameters pp = device.PresentationParameters;
 			screenW = pp.BackBufferWidth;
 			screenH = pp.BackBufferHeight;
+			if (!layoutLoaded)
+				LoadLayout();
 			if (!Enabled || realPadConnected)
 				return;
 
@@ -245,7 +298,7 @@ namespace CelesteAndroid
 
 			// Analógico fixo no canto inferior esquerdo.
 			Vector2 baseCenter = StickBase;
-			float range = screenH * StickRadius;
+			float range = StickRange;
 			Vector2 knob = baseCenter + stickKnob;
 			float a = stickActive ? Opacity * 1.3f : Opacity;
 			DrawCircle(ring!, baseCenter, range * 1.1f, Color.White * a);

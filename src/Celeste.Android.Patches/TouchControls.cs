@@ -22,7 +22,9 @@ namespace CelesteAndroid
 	public static class TouchControls
 	{
 		// ---- Ajustes (valores relativos à altura da tela, para valer em qualquer aparelho) ----
-		public static float Opacity = 0.45f;          // 0..1
+		public static float Opacity = 0.45f;          // 0..1 (analógico)
+		/// <summary>Opacidade dos botões pixel art, derivada de Opacity (a opção da tela inicial): o padrão de 45% vira 90%, 0% some e 100% fica sólido.</summary>
+		public static float ButtonOpacity => Opacity <= 0.45f ? Opacity / 0.45f * 0.9f : Math.Min(1f, 0.9f + (Opacity - 0.45f) / 0.55f * 0.1f);
 		public static float ButtonSize = 0.17f;       // diâmetro dos botões
 		public static float StickRadius = 0.13f;      // alcance do analógico
 		public static float StickDeadZone = 0.18f;    // fração do alcance ignorada
@@ -41,7 +43,7 @@ namespace CelesteAndroid
 			showFps = HostConfig.ShowFps;
 		}
 
-		private enum Btn { Jump, Dash, Grab, Pause }
+		private enum Btn { Jump, Dash, Grab, Pause, Tab }
 
 		private struct Finger
 		{
@@ -50,7 +52,7 @@ namespace CelesteAndroid
 		}
 
 		private static readonly List<Finger> fingers = new();
-		private static readonly bool[] pressed = new bool[4];
+		private static readonly bool[] pressed = new bool[5];
 		private static readonly Stopwatch clock = Stopwatch.StartNew();
 		private static long lastPollMs = -100;
 
@@ -112,11 +114,11 @@ namespace CelesteAndroid
 		}
 
 		// ---- Layout: padrão + personalização salva pelo editor (ControlsEditorActivity) ----
-		// Índices 0..3 = Btn (Jump, Dash, Grab, Pause); 4 = analógico.
-		private const int StickIdx = 4;
-		private static readonly bool[] custom = new bool[5];
-		private static readonly Vector2[] customPos = new Vector2[5]; // centro, em frações da largura/altura da tela
-		private static readonly float[] customScale = { 1f, 1f, 1f, 1f, 1f };
+		// Índices 0..4 = Btn (Jump, Dash, Grab, Pause, Tab); 5 = analógico.
+		private const int StickIdx = 5;
+		private static readonly bool[] custom = new bool[6];
+		private static readonly Vector2[] customPos = new Vector2[6]; // centro, em frações da largura/altura da tela
+		private static readonly float[] customScale = { 1f, 1f, 1f, 1f, 1f, 1f };
 		private static bool layoutLoaded;
 
 		/// <summary>Lê touch_layout.txt (linhas "nome=x,y,escala"); sem arquivo, vale o layout padrão.</summary>
@@ -133,7 +135,7 @@ namespace CelesteAndroid
 					string[] kv = line.Split('=');
 					if (kv.Length != 2)
 						continue;
-					int idx = kv[0].Trim() switch { "jump" => 0, "dash" => 1, "grab" => 2, "pause" => 3, "stick" => 4, _ => -1 };
+					int idx = kv[0].Trim() switch { "jump" => 0, "dash" => 1, "grab" => 2, "pause" => 3, "tab" => 4, "stick" => 5, _ => -1 };
 					string[] v = kv[1].Split(',');
 					if (idx < 0 || v.Length != 3)
 						continue;
@@ -173,11 +175,12 @@ namespace CelesteAndroid
 				Btn.Dash => new Vector2(screenW - 2.45f * u, screenH - 0.95f * u),
 				Btn.Grab => new Vector2(screenW - 2.15f * u, screenH - 2.35f * u),
 				Btn.Pause => new Vector2(screenW - 0.8f * u, 0.8f * u),
+				Btn.Tab => new Vector2(screenW - 1.75f * u, 0.8f * u),
 				_ => Vector2.Zero,
 			};
 		}
 
-		private static float Radius(Btn b) => (b == Btn.Pause ? 0.32f : 0.5f) * Unit(b);
+		private static float Radius(Btn b) => (b == Btn.Pause ? 0.32f : b == Btn.Tab ? 0.4f : 0.5f) * Unit(b);
 
 		private static bool InsideButton(Vector2 p, out Btn which)
 		{
@@ -265,7 +268,8 @@ namespace CelesteAndroid
 			if (s.Y < -0.5f) down.Add(Buttons.DPadDown);
 			if (s.X < -0.5f) down.Add(Buttons.DPadLeft);
 			if (s.X > 0.5f) down.Add(Buttons.DPadRight);
-			return new GamePadState(s, Vector2.Zero, 0f, pressed[(int)Btn.Grab] ? 1f : 0f, down.ToArray());
+			// Tab (diário): no Celeste o Journal fica no gatilho esquerdo do controle (e na tecla Tab no teclado).
+			return new GamePadState(s, Vector2.Zero, pressed[(int)Btn.Tab] ? 1f : 0f, pressed[(int)Btn.Grab] ? 1f : 0f, down.ToArray());
 		}
 
 		// ---- Chamado pelos shims ----
@@ -281,7 +285,17 @@ namespace CelesteAndroid
 
 		// ---- Overlay ----
 		private static SpriteBatch? batch;
-		private static Texture2D? disc, ring, pixel;
+		private static Texture2D? disc, ring, glow, pixel;
+		private static readonly Texture2D?[] sprites = new Texture2D?[5];
+
+		private static PixelButtonArt.Sprite SpriteOf(Btn b) => b switch
+		{
+			Btn.Jump => PixelButtonArt.Jump,
+			Btn.Dash => PixelButtonArt.Dash,
+			Btn.Grab => PixelButtonArt.Grab,
+			Btn.Tab => PixelButtonArt.Tab,
+			_ => PixelButtonArt.Pause,
+		};
 
 		public static void Draw(GraphicsDevice device)
 		{
@@ -299,34 +313,44 @@ namespace CelesteAndroid
 				batch = new SpriteBatch(device);
 				disc = MakeCircle(device, 128, 0f);
 				ring = MakeCircle(device, 128, 0.12f);
+				glow = MakeGlow(device, 128);
 				pixel = new Texture2D(device, 1, 1);
 				pixel.SetData(new[] { Color.White });
+				foreach (Btn b in Enum.GetValues(typeof(Btn)))
+					sprites[(int)b] = MakeSprite(device, SpriteOf(b));
 			}
 
 			Viewport saved = device.Viewport;
 			device.Viewport = new Viewport(0, 0, screenW, screenH);
-			batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp, null, null);
 
 			if (showControls)
 			{
-				// Analógico fixo no canto inferior esquerdo.
+				// 1) Analógico fixo no canto inferior esquerdo + brilho suave atrás dos botões.
+				batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp, null, null);
 				Vector2 baseCenter = StickBase;
 				float range = StickRange;
 				Vector2 knob = baseCenter + stickKnob;
 				float a = stickActive ? Opacity * 1.3f : Opacity;
 				DrawCircle(ring!, baseCenter, range * 1.1f, Color.White * a);
 				DrawCircle(disc!, knob, range * 0.45f, Color.White * (a * 1.1f));
+				foreach (Btn b in Enum.GetValues(typeof(Btn)))
+					DrawGlow(b);
+				batch.End();
 
-				DrawButton(Btn.Jump, new Color(120, 220, 140), 'A');
-				DrawButton(Btn.Dash, new Color(240, 120, 150), 'X');
-				DrawButton(Btn.Grab, new Color(120, 170, 240), 'G');
-				DrawButton(Btn.Pause, new Color(220, 220, 220), 'P');
+				// 2) Botões pixel art: amostragem por ponto, para os pixels ficarem nítidos.
+				batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, null, null);
+				foreach (Btn b in Enum.GetValues(typeof(Btn)))
+					DrawButton(b);
+				batch.End();
 			}
 
 			if (showFps)
+			{
+				batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, null, null);
 				DrawFps();
+				batch.End();
+			}
 
-			batch.End();
 			device.Viewport = saved;
 		}
 
@@ -394,15 +418,32 @@ namespace CelesteAndroid
 			}
 		}
 
-		private static void DrawButton(Btn b, Color color, char glyph)
+		/// <summary>Retângulo do sprite: o tamanho é sempre múltiplo de 28 px, para cada "pixel" da arte cair num número inteiro de pixels da tela.</summary>
+		private static Rectangle SpriteRect(Btn b)
 		{
-			bool down = pressed[(int)b];
-			float r = Radius(b);
-			float alpha = down ? Math.Min(1f, Opacity * 1.9f) : Opacity;
+			int n = PixelButtonArt.Size;
+			int cell = Math.Max(1, (int)Math.Round(Radius(b) * 2f / n));
+			int size = cell * n;
 			Vector2 c = Center(b);
-			DrawCircle(disc!, c, r * (down ? 0.92f : 1f), color * (alpha * 0.55f));
-			DrawCircle(ring!, c, r, color * alpha);
-			DrawGlyph(glyph, c, r * 0.9f, Color.White * Math.Min(1f, alpha * 1.8f));
+			// Apertado: o botão "afunda" um pixel da arte.
+			int y = (int)Math.Round(c.Y - size / 2f) + (pressed[(int)b] ? cell : 0);
+			return new Rectangle((int)Math.Round(c.X - size / 2f), y, size, size);
+		}
+
+		private static void DrawGlow(Btn b)
+		{
+			int rgb = SpriteOf(b).GlowRgb;
+			Color tint = new Color((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255);
+			Rectangle r = SpriteRect(b);
+			int g = (int)(r.Width * 1.35f);
+			float alpha = ButtonOpacity * (pressed[(int)b] ? 0.75f : 0.55f);
+			batch!.Draw(glow!, new Rectangle(r.Center.X - g / 2, r.Center.Y - g / 2, g, g), tint * alpha);
+		}
+
+		private static void DrawButton(Btn b)
+		{
+			float alpha = pressed[(int)b] ? 1f : ButtonOpacity;
+			batch!.Draw(sprites[(int)b]!, SpriteRect(b), Color.White * alpha);
 		}
 
 		private static void DrawCircle(Texture2D tex, Vector2 center, float radius, Color color)
@@ -410,26 +451,42 @@ namespace CelesteAndroid
 			batch!.Draw(tex, new Rectangle((int)(center.X - radius), (int)(center.Y - radius), (int)(radius * 2), (int)(radius * 2)), color);
 		}
 
-		// Letras 5x7 desenhadas com retângulos (sem depender de fonte do jogo).
-		private static readonly Dictionary<char, string[]> glyphs = new()
+		/// <summary>Monta a textura 28x28 a partir do mapa de caracteres de PixelButtonArt (alfa já pré-multiplicado: tudo é opaco ou transparente).</summary>
+		private static Texture2D MakeSprite(GraphicsDevice device, PixelButtonArt.Sprite s)
 		{
-			['A'] = new[] { "01110", "10001", "10001", "11111", "10001", "10001", "10001" },
-			['X'] = new[] { "10001", "10001", "01010", "00100", "01010", "10001", "10001" },
-			['G'] = new[] { "01111", "10000", "10000", "10111", "10001", "10001", "01111" },
-			['P'] = new[] { "11011", "11011", "11011", "11011", "11011", "11011", "11011" }, // pausa: duas barras
-		};
+			int n = PixelButtonArt.Size;
+			Color[] data = new Color[n * n];
+			for (int y = 0; y < n; y++)
+			{
+				for (int x = 0; x < n; x++)
+				{
+					int rgb = s.ColorOf(s.Rows[y][x]);
+					data[y * n + x] = rgb < 0 ? Color.Transparent : new Color((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255, 255);
+				}
+			}
+			Texture2D tex = new(device, n, n);
+			tex.SetData(data);
+			return tex;
+		}
 
-		private static void DrawGlyph(char ch, Vector2 center, float size, Color color)
+		/// <summary>Disco branco com borda bem suave (pré-multiplicado), usado como brilho colorido atrás dos botões.</summary>
+		private static Texture2D MakeGlow(GraphicsDevice device, int size)
 		{
-			if (!glyphs.TryGetValue(ch, out string[]? rows))
-				return;
-			float cell = size / 7f;
-			float x0 = center.X - cell * 2.5f;
-			float y0 = center.Y - cell * 3.5f;
-			for (int y = 0; y < rows.Length; y++)
-				for (int x = 0; x < rows[y].Length; x++)
-					if (rows[y][x] == '1')
-						batch!.Draw(pixel!, new Rectangle((int)(x0 + x * cell), (int)(y0 + y * cell), (int)Math.Ceiling(cell), (int)Math.Ceiling(cell)), color);
+			Color[] data = new Color[size * size];
+			float r = size / 2f;
+			for (int y = 0; y < size; y++)
+			{
+				for (int x = 0; x < size; x++)
+				{
+					float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(r, r)) / r;
+					float t = Math.Clamp((1f - d) / 0.30f, 0f, 1f);
+					byte v = (byte)(t * t * (3f - 2f * t) * 255f);
+					data[y * size + x] = new Color(v, v, v, v);
+				}
+			}
+			Texture2D tex = new(device, size, size);
+			tex.SetData(data);
+			return tex;
 		}
 
 		/// <summary>Círculo com alfa pré-multiplicado (o SpriteBatch padrão usa AlphaBlend pré-multiplicado). ringWidth 0 = disco cheio.</summary>

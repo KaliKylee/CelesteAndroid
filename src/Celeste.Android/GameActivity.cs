@@ -33,6 +33,11 @@ namespace CelesteAndroid
 		public const string ExtraHideTouch = "hide_touch";
 		public const string ExtraTouchOpacity = "touch_opacity";
 
+		// Passou da fase de risco da inicialização gráfica: apaga o recado que o launcher usa para detectar travamentos.
+		private const int SurviveMs = 15000, QuickExitMs = 5000;
+		private static System.Threading.Timer? surviveTimer;
+		private readonly System.Diagnostics.Stopwatch alive = System.Diagnostics.Stopwatch.StartNew();
+
 		// O Java carrega SDL3 e FMOD (o FMOD precisa estar carregado antes do FMOD.init);
 		// FNA3D/FAudio são carregados pelo .NET via DllImport.
 		protected override string[] GetLibraries() => new[] { "SDL3", "fmod", "fmodstudio" };
@@ -56,6 +61,9 @@ namespace CelesteAndroid
 		protected override void OnDestroy()
 		{
 			Org.Fmod.FMOD.Close();
+			// Saída normal depois de alguns segundos conta como partida boa (um travamento nativo nem chega aqui).
+			if (alive.ElapsedMilliseconds > QuickExitMs)
+				GraphicsDriver.MarkLaunchOk(this);
 			base.OnDestroy();
 			if (IsFinishing)
 				Process.KillProcess(Process.MyPid());
@@ -64,6 +72,9 @@ namespace CelesteAndroid
 		// Chamado pelo SDL na thread "SDLThread" depois que a superfície existe; substitui o SDL_main nativo.
 		protected override void Main()
 		{
+			// Viva depois de 15 s: Vulkan/OpenGL inicializaram bem (ver GraphicsDriver).
+			surviveTimer = new System.Threading.Timer(_ => GraphicsDriver.MarkLaunchOk(this), null, SurviveMs, System.Threading.Timeout.Infinite);
+
 			// O FNA/FNA3D loga no stderr, que no Android não vai para o logcat.
 			FNALoggerEXT.LogInfo = msg => Log.Info(LogTag, msg);
 			FNALoggerEXT.LogWarn = msg => Log.Warn(LogTag, msg);

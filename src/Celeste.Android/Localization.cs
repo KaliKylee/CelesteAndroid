@@ -66,6 +66,10 @@ namespace CelesteAndroid
 		public static string ImportZip => T("Importar .zip", "Import .zip", "Importar .zip");
 		public static string ImportSaves => T("Importar saves", "Import saves", "Importar partidas");
 		public static string Graphics => T("Gráficos", "Graphics", "Gráficos");
+		public static string GraphicsFallback => T(
+			"O jogo travou ao iniciar com Vulkan. Troquei para OpenGL ES; você pode mudar em Gráficos.",
+			"The game crashed on start with Vulkan. Switched to OpenGL ES; you can change it under Graphics.",
+			"El juego falló al iniciar con Vulkan. Cambié a OpenGL ES; puedes cambiarlo en Gráficos.");
 		public static string Options => T("Opções", "Options", "Opciones");
 		public static string EditControls => T("Editar controles", "Edit controls", "Editar controles");
 		public static string ShowFps => T("Mostrar FPS", "Show FPS", "Mostrar FPS");

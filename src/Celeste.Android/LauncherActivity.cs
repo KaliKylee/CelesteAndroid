@@ -34,7 +34,6 @@ namespace CelesteAndroid
 		private const int RequestFolder = 1;
 		private const int RequestZip = 2;
 		private const int RequestSaves = 3;
-		private const string PrefDriver = "driver";
 
 		private static readonly Color Night = Color.ParseColor("#120C22");
 		private static readonly Color Accent = Color.ParseColor("#F2B8D8");
@@ -356,15 +355,21 @@ namespace CelesteAndroid
 					? L.ReadyToPlay
 					: L.PickPrompt;
 			}
-			driverToggle.Text = L.Graphics + ": " + (Prefs.GetString(PrefDriver, "") == "OpenGL" ? "OpenGL ES" : "Vulkan");
+			driverToggle.Text = L.Graphics + ": " + (GraphicsDriver.Effective(Prefs) == GraphicsDriver.OpenGL ? "OpenGL ES" : "Vulkan");
 		}
 
 		private void Play()
 		{
+			// Se a partida anterior com Vulkan travou ao iniciar, troca para OpenGL ES e avisa.
+			if (GraphicsDriver.PrepareLaunch(this, Prefs))
+			{
+				Toast.MakeText(this, L.GraphicsFallback, ToastLength.Long)?.Show();
+				RefreshState();
+			}
 			var intent = new Intent(this, typeof(GameActivity));
-			string? driver = Prefs.GetString(PrefDriver, "");
-			if (!string.IsNullOrEmpty(driver))
-				intent.PutExtra(GameActivity.ExtraDriver, driver);
+			// Vulkan é o padrão do FNA3D: só o OpenGL ES precisa ser forçado.
+			if (GraphicsDriver.Effective(Prefs) == GraphicsDriver.OpenGL)
+				intent.PutExtra(GameActivity.ExtraDriver, GraphicsDriver.OpenGL);
 			// O jogo roda em outro processo: as opções vão junto no Intent.
 			intent.PutExtra(GameActivity.ExtraShowFps, GameOptions.ShowFps(Prefs));
 			intent.PutExtra(GameActivity.ExtraHideTouch, GameOptions.HideTouch(Prefs));
@@ -374,8 +379,7 @@ namespace CelesteAndroid
 
 		private void ToggleDriver()
 		{
-			string next = Prefs.GetString(PrefDriver, "") == "OpenGL" ? "" : "OpenGL";
-			Prefs.Edit()!.PutString(PrefDriver, next)!.Apply();
+			GraphicsDriver.Toggle(Prefs);
 			RefreshState();
 		}
 

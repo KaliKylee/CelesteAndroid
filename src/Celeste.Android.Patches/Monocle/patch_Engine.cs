@@ -24,10 +24,6 @@ namespace Monocle
 		{
 		}
 
-		/// <summary>
-		/// Igual ao original, mas desenha uma imagem nas faixas laterais (telas mais largas que 16:9)
-		/// em vez de deixá-las pretas.
-		/// </summary>
 		[MonoModReplace]
 		protected new virtual void RenderCore()
 		{
@@ -47,7 +43,6 @@ namespace Monocle
 				scene.Render();
 				scene.AfterRender();
 			}
-			// Controles na tela por cima de tudo (somem se houver controle físico conectado).
 			TouchControls.Draw(GraphicsDevice);
 		}
 
@@ -75,7 +70,6 @@ namespace Monocle
 			GraphicsDevice.Viewport = new Viewport(0, 0, pp.BackBufferWidth, pp.BackBufferHeight);
 			GraphicsDevice.Clear(Color.Black);
 
-			// "Cover": preenche a tela inteira mantendo a proporção da imagem.
 			float scale = Math.Max(
 				pp.BackBufferWidth / (float)pillarboxBackground.Width,
 				pp.BackBufferHeight / (float)pillarboxBackground.Height
@@ -85,7 +79,6 @@ namespace Monocle
 
 			pillarboxBatch!.Begin(SpriteSortMode.Deferred, BlendState.Opaque, SamplerState.LinearClamp, null, null);
 			pillarboxBatch.Draw(pillarboxBackground, position, null, Color.White, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-			// Área do jogo: cor de fundo normal, para cenas que não cobrem a tela toda (loading, wipes).
 			Viewport view = Viewport;
 			pillarboxBatch.Draw(pillarboxPixel, new Rectangle(view.X, view.Y, view.Width, view.Height), ClearColor);
 			pillarboxBatch.End();

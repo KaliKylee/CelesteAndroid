@@ -15,6 +15,21 @@ namespace CelesteAndroid
 		public const string BackgroundPathKey = "CelesteAndroid.BackgroundPath";
 		public const string TouchLayoutPathKey = "CelesteAndroid.TouchLayoutPath";
 
+		public const string ShowFpsKey = "CelesteAndroid.ShowFps";
+		public const string HideTouchKey = "CelesteAndroid.HideTouch";
+		public const string TouchOpacityKey = "CelesteAndroid.TouchOpacity";
+
+		/// <summary>Contador de FPS na tela (opção da tela inicial).</summary>
+		public static bool ShowFps => AppContext.GetData(ShowFpsKey) as string == "1";
+
+		/// <summary>Esconde (e desativa) os botões virtuais de toque (opção da tela inicial).</summary>
+		public static bool HideTouch => AppContext.GetData(HideTouchKey) as string == "1";
+
+		/// <summary>Opacidade dos controles em %, 0..100; null se o host não definiu (vale o padrão do TouchControls).</summary>
+		public static int? TouchOpacityPercent =>
+			int.TryParse(AppContext.GetData(TouchOpacityKey) as string, System.Globalization.NumberStyles.Integer,
+				System.Globalization.CultureInfo.InvariantCulture, out int v) ? (int?)Math.Clamp(v, 0, 100) : null;
+
 		public static string Platform => AppContext.GetData(PlatformKey) as string ?? "Android";
 
 		/// <summary>Imagem para as faixas laterais em telas mais largas que 16:9 (opcional).</summary>

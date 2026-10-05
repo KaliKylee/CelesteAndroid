@@ -31,6 +31,16 @@ namespace CelesteAndroid
 		public static float StickBottom = 0.28f;      // distância do centro até a borda de baixo, em múltiplos da altura
 		public static bool Enabled = true;
 
+		// Opções vindas da tela inicial (menu "Opções" e editor de controles), via HostConfig.
+		private static bool showFps;
+
+		static TouchControls()
+		{
+			Opacity = (HostConfig.TouchOpacityPercent ?? 45) / 100f;
+			Enabled = !HostConfig.HideTouch;
+			showFps = HostConfig.ShowFps;
+		}
+
 		private enum Btn { Jump, Dash, Grab, Pause }
 
 		private struct Finger
@@ -280,7 +290,8 @@ namespace CelesteAndroid
 			screenH = pp.BackBufferHeight;
 			if (!layoutLoaded)
 				LoadLayout();
-			if (!Enabled || realPadConnected)
+			bool showControls = Enabled && !realPadConnected;
+			if (!showControls && !showFps)
 				return;
 
 			if (batch == null)
@@ -296,21 +307,91 @@ namespace CelesteAndroid
 			device.Viewport = new Viewport(0, 0, screenW, screenH);
 			batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp, null, null);
 
-			// Analógico fixo no canto inferior esquerdo.
-			Vector2 baseCenter = StickBase;
-			float range = StickRange;
-			Vector2 knob = baseCenter + stickKnob;
-			float a = stickActive ? Opacity * 1.3f : Opacity;
-			DrawCircle(ring!, baseCenter, range * 1.1f, Color.White * a);
-			DrawCircle(disc!, knob, range * 0.45f, Color.White * (a * 1.1f));
+			if (showControls)
+			{
+				// Analógico fixo no canto inferior esquerdo.
+				Vector2 baseCenter = StickBase;
+				float range = StickRange;
+				Vector2 knob = baseCenter + stickKnob;
+				float a = stickActive ? Opacity * 1.3f : Opacity;
+				DrawCircle(ring!, baseCenter, range * 1.1f, Color.White * a);
+				DrawCircle(disc!, knob, range * 0.45f, Color.White * (a * 1.1f));
 
-			DrawButton(Btn.Jump, new Color(120, 220, 140), 'A');
-			DrawButton(Btn.Dash, new Color(240, 120, 150), 'X');
-			DrawButton(Btn.Grab, new Color(120, 170, 240), 'G');
-			DrawButton(Btn.Pause, new Color(220, 220, 220), 'P');
+				DrawButton(Btn.Jump, new Color(120, 220, 140), 'A');
+				DrawButton(Btn.Dash, new Color(240, 120, 150), 'X');
+				DrawButton(Btn.Grab, new Color(120, 170, 240), 'G');
+				DrawButton(Btn.Pause, new Color(220, 220, 220), 'P');
+			}
+
+			if (showFps)
+				DrawFps();
 
 			batch.End();
 			device.Viewport = saved;
+		}
+
+		// ---- Contador de FPS ----
+		private static readonly Stopwatch fpsClock = Stopwatch.StartNew();
+		private static long fpsWindowStartMs;
+		private static int fpsFrames;
+		private static int fpsValue;
+
+		private static void DrawFps()
+		{
+			// Quadros desenhados por segundo, atualizado a cada 500 ms para o número não tremer.
+			fpsFrames++;
+			long now = fpsClock.ElapsedMilliseconds;
+			long elapsed = now - fpsWindowStartMs;
+			if (elapsed >= 500)
+			{
+				fpsValue = (int)Math.Round(fpsFrames * 1000.0 / elapsed);
+				fpsFrames = 0;
+				fpsWindowStartMs = now;
+			}
+
+			float cell = Math.Max(2f, screenH * 0.0045f);
+			DrawText($"{fpsValue} FPS", new Vector2(cell * 3f, cell * 3f), cell, Color.White);
+		}
+
+		// Fonte 5x7 só para o contador (o glifo 'P' do botão de pausa são duas barras, por isso é separada).
+		private static readonly Dictionary<char, string[]> textGlyphs = new()
+		{
+			['0'] = new[] { "01110", "10001", "10011", "10101", "11001", "10001", "01110" },
+			['1'] = new[] { "00100", "01100", "00100", "00100", "00100", "00100", "01110" },
+			['2'] = new[] { "01110", "10001", "00001", "00010", "00100", "01000", "11111" },
+			['3'] = new[] { "11110", "00001", "00001", "01110", "00001", "00001", "11110" },
+			['4'] = new[] { "00010", "00110", "01010", "10010", "11111", "00010", "00010" },
+			['5'] = new[] { "11111", "10000", "11110", "00001", "00001", "10001", "01110" },
+			['6'] = new[] { "00110", "01000", "10000", "11110", "10001", "10001", "01110" },
+			['7'] = new[] { "11111", "00001", "00010", "00100", "01000", "01000", "01000" },
+			['8'] = new[] { "01110", "10001", "10001", "01110", "10001", "10001", "01110" },
+			['9'] = new[] { "01110", "10001", "10001", "01111", "00001", "00010", "01100" },
+			['F'] = new[] { "11111", "10000", "10000", "11110", "10000", "10000", "10000" },
+			['P'] = new[] { "11110", "10001", "10001", "11110", "10000", "10000", "10000" },
+			['S'] = new[] { "01111", "10000", "10000", "01110", "00001", "00001", "11110" },
+		};
+
+		/// <summary>Texto com sombra (legível sobre qualquer cenário); topLeft e cell em pixels.</summary>
+		private static void DrawText(string text, Vector2 topLeft, float cell, Color color)
+		{
+			DrawTextPass(text, topLeft + new Vector2(cell * 0.5f), cell, Color.Black * 0.75f);
+			DrawTextPass(text, topLeft, cell, color);
+		}
+
+		private static void DrawTextPass(string text, Vector2 topLeft, float cell, Color color)
+		{
+			float x = topLeft.X;
+			foreach (char ch in text)
+			{
+				if (textGlyphs.TryGetValue(ch, out string[]? rows))
+				{
+					for (int y = 0; y < rows.Length; y++)
+						for (int col = 0; col < rows[y].Length; col++)
+							if (rows[y][col] == '1')
+								batch!.Draw(pixel!, new Rectangle((int)(x + col * cell), (int)(topLeft.Y + y * cell), (int)Math.Ceiling(cell), (int)Math.Ceiling(cell)), color);
+				}
+				x += cell * 6f; // 5 colunas + 1 de espaço (o espaço em branco cai aqui também)
+			}
 		}
 
 		private static void DrawButton(Btn b, Color color, char glyph)

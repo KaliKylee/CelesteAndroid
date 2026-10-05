@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Build público: sem arte embutida; o launcher usa a key art do jogo importado (ou esta cor). -->
+<resources>
+	<item type="drawable" name="launcher_art">@color/celeste_sky</item>
+</resources>

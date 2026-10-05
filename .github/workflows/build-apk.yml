@@ -1,0 +1,153 @@
+name: Build APK
+
+# Builds the PUBLIC apk (no game files, no official art). Needs two private downloads, because
+# Celeste.exe and FMOD are proprietary and can't live in the repo:
+#   secrets.CELESTE_ZIP_URL  direct link to a .zip (or the bare .exe) containing Celeste.exe, FNA build
+#   secrets.FMOD_ZIP_URL     direct link to a .zip with libfmod.so, libfmodstudio.so (arm64-v8a) and fmod.jar, FMOD 1.10.14
+# Optional signing (otherwise the debug key is used and updates over a previous install will fail):
+#   secrets.KEYSTORE_BASE64, KEYSTORE_ALIAS, KEYSTORE_PASSWORD
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write # only used to attach the APK to a release on tag pushes
+
+jobs:
+  apk:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      CELESTE_ZIP_URL: ${{ secrets.CELESTE_ZIP_URL }}
+      FMOD_ZIP_URL: ${{ secrets.FMOD_ZIP_URL }}
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      KEYSTORE_ALIAS: ${{ secrets.KEYSTORE_ALIAS }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      NDK_VERSION: 27.3.13750724
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Fetch submodules if missing
+        run: |
+          if (-not (Test-Path external/SDL/CMakeLists.txt)) {
+            Remove-Item external/SDL -Recurse -Force -ErrorAction SilentlyContinue
+            git clone --depth 1 --branch release-3.4.16 https://github.com/libsdl-org/SDL.git external/SDL
+            if ($LASTEXITCODE -ne 0) { throw 'SDL clone failed' }
+          }
+          if (-not (Test-Path external/FNA/FNA.Core.csproj)) {
+            Remove-Item external/FNA -Recurse -Force -ErrorAction SilentlyContinue
+            git clone --recursive --shallow-submodules --depth 1 https://github.com/FNA-XNA/FNA.git external/FNA
+            if ($LASTEXITCODE -ne 0) { throw 'FNA clone failed' }
+          }
+
+      - name: Check required secrets
+        run: |
+          foreach ($n in 'CELESTE_ZIP_URL', 'FMOD_ZIP_URL') {
+            if (-not (Get-Item "env:$n" -ErrorAction SilentlyContinue).Value) {
+              throw "Missing repository secret $n (Settings > Secrets and variables > Actions)."
+            }
+          }
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platforms;android-36 build-tools;36.0.0 platform-tools ndk;${{ env.NDK_VERSION }}
+
+      - name: Android environment
+        run: |
+          "ANDROID_HOME=$env:ANDROID_HOME" >> $env:GITHUB_ENV
+          "ANDROID_NDK_HOME=$env:ANDROID_HOME\ndk\$env:NDK_VERSION" >> $env:GITHUB_ENV
+          "JAVA_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
+          if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) { choco install ninja -y --no-progress }
+
+      - name: Install .NET Android workload
+        run: dotnet workload install android
+
+      - name: Fetch Celeste.exe (private)
+        run: |
+          $tmp = Join-Path $env:RUNNER_TEMP 'celeste'
+          New-Item -ItemType Directory -Force $tmp, Celeste | Out-Null
+          $file = Join-Path $tmp 'download.bin'
+          Invoke-WebRequest -Uri $env:CELESTE_ZIP_URL -OutFile $file
+          $head = [IO.File]::ReadAllBytes($file)[0..1]
+          if ($head[0] -eq 0x4D -and $head[1] -eq 0x5A) {      # "MZ": a bare Celeste.exe
+            Copy-Item $file Celeste\Celeste.exe
+          } else {
+            Expand-Archive $file (Join-Path $tmp 'x') -Force
+            $exe = Get-ChildItem (Join-Path $tmp 'x') -Recurse -Filter Celeste.exe | Select-Object -First 1
+            if (-not $exe) { throw 'Celeste.exe not found in the CELESTE_ZIP_URL download.' }
+            Copy-Item $exe.FullName Celeste\Celeste.exe
+          }
+
+      - name: Fetch FMOD 1.10.14 (private)
+        run: |
+          $tmp = Join-Path $env:RUNNER_TEMP 'fmod'
+          $dest = 'fmod\libs\android-arm64'
+          New-Item -ItemType Directory -Force $tmp, $dest | Out-Null
+          Invoke-WebRequest -Uri $env:FMOD_ZIP_URL -OutFile (Join-Path $tmp 'fmod.zip')
+          Expand-Archive (Join-Path $tmp 'fmod.zip') (Join-Path $tmp 'x') -Force
+          foreach ($name in 'libfmod.so', 'libfmodstudio.so', 'fmod.jar') {
+            $all = @(Get-ChildItem (Join-Path $tmp 'x') -Recurse -File | Where-Object Name -eq $name)
+            $pick = @($all | Where-Object { $_.FullName -match 'arm64' }) + $all | Select-Object -First 1
+            if (-not $pick) { throw "$name not found in the FMOD download." }
+            Copy-Item $pick.FullName $dest
+          }
+
+      - name: Cache native libs (SDL3, FNA3D, FAudio)
+        id: natives
+        uses: actions/cache@v4
+        with:
+          path: natives
+          key: natives-android-arm64-${{ env.NDK_VERSION }}-${{ hashFiles('scripts/build-natives-android.ps1') }}-${{ hashFiles('.gitmodules') }}-${{ github.sha }}
+          restore-keys: |
+            natives-android-arm64-${{ env.NDK_VERSION }}-${{ hashFiles('scripts/build-natives-android.ps1') }}-${{ hashFiles('.gitmodules') }}-
+
+      - name: Build native libs
+        run: |
+          # The submodule commits decide the cache validity: rebuild when they differ from the cached build.
+          $rev = ((git -C external/SDL rev-parse HEAD) + ' ' + (git -C external/FNA rev-parse HEAD)).Trim()
+          $stamp = 'natives\.submodules'
+          if ((Test-Path natives\android-arm64\libSDL3.so) -and (Test-Path $stamp) -and ((Get-Content $stamp -Raw).Trim() -eq $rev)) {
+            Write-Host 'Natives up to date (cache hit).'
+          } else {
+            scripts\build-natives-android.ps1 -Clean
+            Set-Content $stamp $rev
+          }
+
+      - name: Release keystore (optional)
+        if: env.KEYSTORE_BASE64 != ''
+        run: |
+          $dir = Join-Path $env:USERPROFILE '.celeste-android'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          $ks = Join-Path $dir 'release.keystore'
+          [IO.File]::WriteAllBytes($ks, [Convert]::FromBase64String($env:KEYSTORE_BASE64))
+          @("CELESTE_KEYSTORE=$ks", "CELESTE_KEYSTORE_ALIAS=$env:KEYSTORE_ALIAS", "CELESTE_KEYSTORE_PASS=$env:KEYSTORE_PASSWORD") |
+            Set-Content (Join-Path $dir 'keystore.env')
+
+      - name: Build public APK
+        run: scripts\build-release.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CelesteAndroid-apk
+          path: out/*.apk
+          if-no-files-found: error
+
+      - name: Attach to GitHub release (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.apk

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<style name="Theme.Celeste" parent="@android:style/Theme.Material.NoActionBar.Fullscreen">
+		<item name="android:windowBackground">@color/celeste_night</item>
+		<item name="android:colorAccent">@color/celeste_accent</item>
+		<item name="android:statusBarColor">@android:color/transparent</item>
+		<item name="android:navigationBarColor">@android:color/transparent</item>
+		<item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+		<!-- Splash do sistema (Android 12+): ícone do app sobre o céu noturno. -->
+		<item name="android:windowSplashScreenBackground">@color/celeste_night</item>
+		<item name="android:windowSplashScreenAnimatedIcon">@mipmap/app_icon</item>
+	</style>
+</resources>

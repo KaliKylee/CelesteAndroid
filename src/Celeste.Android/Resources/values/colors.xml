@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<color name="celeste_sky">#3A335C</color>
+	<color name="celeste_night">#120C22</color>
+	<color name="celeste_accent">#F2B8D8</color>
+</resources>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Ajustes nos bindings gerados do Java do SDL3: campos protegidos cujo tipo é uma classe
+     package-private não podem ser expostos em C#, e não precisamos deles. -->
+<metadata>
+	<remove-node path="/api/package[@name='org.libsdl.app']/class[@name='SDLActivity']/field[@name='mClipboardHandler']" />
+	<remove-node path="/api/package[@name='org.libsdl.app']/class[@name='SDLActivity']/field[@name='mMotionListener']" />
+	<remove-node path="/api/package[@name='org.libsdl.app']/class[@name='SDLControllerManager']/field[@name='mHapticHandler']" />
+	<remove-node path="/api/package[@name='org.libsdl.app']/class[@name='SDLControllerManager']/field[@name='mJoystickHandler']" />
+</metadata>

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<!-- Biblioteca usada pelo host desktop (e no futuro pelo app Android) para gerar o Celeste.dll patcheado. -->
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<RootNamespace>CelesteAndroid.Patcher</RootNamespace>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="MonoMod.Patcher" Version="25.0.1" />
+	</ItemGroup>
+</Project>

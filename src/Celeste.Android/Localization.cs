@@ -66,7 +66,10 @@ namespace CelesteAndroid
 		public static string ImportZip => T("Importar .zip", "Import .zip", "Importar .zip");
 		public static string ImportSaves => T("Importar saves", "Import saves", "Importar partidas");
 		public static string Graphics => T("Gráficos", "Graphics", "Gráficos");
-		public static string CustomizeControls => T("Personalizar controles", "Customize controls", "Personalizar controles");
+		public static string Options => T("Opções", "Options", "Opciones");
+		public static string EditControls => T("Editar controles", "Edit controls", "Editar controles");
+		public static string ShowFps => T("Mostrar FPS", "Show FPS", "Mostrar FPS");
+		public static string HideTouchButtons => T("Ocultar botões de toque", "Hide touch buttons", "Ocultar botones táctiles");
 		public static string ReadyToPlay => T("✓  Pronto pra jogar", "✓  Ready to play", "✓  Listo para jugar");
 		public static string PickPrompt => T(
 			"Selecione a pasta da sua cópia do Celeste para PC (FNA, opengl Build ou do itch.io .zip).",
@@ -80,9 +83,10 @@ namespace CelesteAndroid
 
 		// ---- Editor de controles ----
 		public static string EditorHint => T(
-			"Arraste os controles para mudar de lugar. Use a barra para mudar o tamanho.",
-			"Drag the controls to move them. Use the slider to resize.",
-			"Arrastra los controles para moverlos. Usa la barra para cambiar el tamaño.");
+			"Arraste os controles para mudar de lugar. Use as barras para mudar o tamanho e a opacidade.",
+			"Drag the controls to move them. Use the sliders to change size and opacity.",
+			"Arrastra los controles para moverlos. Usa las barras para cambiar el tamaño y la opacidad.");
+		public static string Opacity => T("Opacidade", "Opacity", "Opacidad");
 		public static string Reset => T("Resetar", "Reset", "Restablecer");
 		public static string Cancel => T("Cancelar", "Cancel", "Cancelar");
 		public static string Save => T("Salvar", "Save", "Guardar");

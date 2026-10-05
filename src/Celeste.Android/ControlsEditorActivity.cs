@@ -37,6 +37,8 @@ namespace CelesteAndroid
 		private ControlsCanvas canvas = null!;
 		private TextView label = null!;
 		private SeekBar seek = null!;
+		private TextView opacityLabel = null!;
+		private SeekBar opacitySeek = null!;
 
 		protected override void OnCreate(Bundle? savedInstanceState)
 		{
@@ -67,6 +69,7 @@ namespace CelesteAndroid
 			root.AddView(shade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
 			canvas = new ControlsCanvas(this, GameInstaller.TouchLayoutFile(this));
+			canvas.OpacityPercent = GameOptions.Opacity(GameOptions.Prefs(this));
 			canvas.SelectionChanged = UpdateBar;
 			root.AddView(canvas, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
@@ -104,6 +107,7 @@ namespace CelesteAndroid
 			reset.Click += (_, _) =>
 			{
 				canvas.ResetToDefaults();
+				canvas.OpacityPercent = GameOptions.DefaultOpacity;
 				UpdateBar();
 			};
 			var cancel = MakeButton(L.Cancel, filled: false);
@@ -112,6 +116,7 @@ namespace CelesteAndroid
 			save.Click += (_, _) =>
 			{
 				canvas.Save();
+				GameOptions.SetOpacity(GameOptions.Prefs(this), canvas.OpacityPercent);
 				Toast.MakeText(this, L.ControlsSaved, ToastLength.Short)?.Show();
 				Finish();
 			};
@@ -119,6 +124,26 @@ namespace CelesteAndroid
 			row.AddView(cancel, new LinearLayout.LayoutParams(Dp(78), Dp(36)) { LeftMargin = Dp(6) });
 			row.AddView(save, new LinearLayout.LayoutParams(Dp(70), Dp(36)) { LeftMargin = Dp(6) });
 			bar.AddView(row, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(4) });
+
+			// Opacidade dos botões: 0% (invisíveis) .. 100% (sólidos), vale para todos os controles.
+			var opacityRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+			opacityRow.SetGravity(GravityFlags.CenterVertical);
+			opacityLabel = Text("", 13, Color.White, true);
+			opacityRow.AddView(opacityLabel, new LinearLayout.LayoutParams(Dp(112), ViewGroup.LayoutParams.WrapContent));
+			opacitySeek = new SeekBar(this) { Max = 100 };
+			opacitySeek.ProgressTintList = Android.Content.Res.ColorStateList.ValueOf(Accent);
+			opacitySeek.ThumbTintList = Android.Content.Res.ColorStateList.ValueOf(Accent);
+			opacitySeek.ProgressChanged += (_, e) =>
+			{
+				if (!e.FromUser)
+					return;
+				canvas.OpacityPercent = e.Progress;
+				UpdateLabel();
+			};
+			opacityRow.AddView(opacitySeek, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+			// Mesmo espaço dos botões da linha de cima, para as duas barras ficarem alinhadas.
+			opacityRow.AddView(new View(this), new LinearLayout.LayoutParams(Dp(8 + 74 + 6 + 78 + 6 + 70), 1));
+			bar.AddView(opacityRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
 
 			int barWidth = Math.Min(Dp(620), Resources!.DisplayMetrics!.WidthPixels - Dp(190));
 			root.AddView(bar, new FrameLayout.LayoutParams(barWidth, ViewGroup.LayoutParams.WrapContent, GravityFlags.Top | GravityFlags.CenterHorizontal) { TopMargin = Dp(8) });
@@ -129,11 +154,15 @@ namespace CelesteAndroid
 		private void UpdateBar()
 		{
 			seek.Progress = (int)Math.Round((canvas.SelectedScale - 0.5f) * 100f);
+			opacitySeek.Progress = canvas.OpacityPercent;
 			UpdateLabel();
 		}
 
-		private void UpdateLabel() =>
+		private void UpdateLabel()
+		{
 			label.Text = $"{ControlsCanvas.Names[canvas.Selected]}: {(int)Math.Round(canvas.SelectedScale * 100f)}%";
+			opacityLabel.Text = $"{L.Opacity}: {canvas.OpacityPercent}%";
+		}
 
 		private TextView Text(string text, float sp, Color color, bool bold)
 		{
@@ -225,6 +254,23 @@ namespace CelesteAndroid
 		public int Selected { get; private set; } = Stick;
 		public Action? SelectionChanged { get; set; }
 		public float SelectedScale => scale[Selected];
+
+		private int opacityPercent = GameOptions.DefaultOpacity;
+
+		/// <summary>Opacidade dos controles (0..100); a prévia usa a mesma fórmula do TouchControls.</summary>
+		public int OpacityPercent
+		{
+			get => opacityPercent;
+			set
+			{
+				opacityPercent = Math.Clamp(value, 0, 100);
+				Invalidate();
+			}
+		}
+
+		// Com 0% a prévia sumiria e não haveria o que arrastar: mantém um mínimo só no editor
+		// (o item selecionado também tem um aro de destaque).
+		private float PreviewAlpha => Math.Max(opacityPercent / 100f, 0.12f);
 
 		public ControlsCanvas(Context context, string path) : base(context)
 		{
@@ -363,6 +409,9 @@ namespace CelesteAndroid
 				DrawItem(canvas, i);
 		}
 
+		/// <summary>Alfa 0..255 = opacidade * fator (mesmos fatores do TouchControls.Draw).</summary>
+		private int A(float factor) => Math.Clamp((int)Math.Round(PreviewAlpha * factor * 255f), 0, 255);
+
 		private void DrawItem(Canvas canvas, int i)
 		{
 			float cx = fx[i] * Width, cy = fy[i] * Height;
@@ -372,25 +421,25 @@ namespace CelesteAndroid
 				float range = StickRange;
 				paint.SetStyle(Paint.Style.Stroke!);
 				paint.StrokeWidth = range * 0.12f;
-				paint.Color = Color.Argb(170, 255, 255, 255);
+				paint.Color = Color.Argb(A(1f), 255, 255, 255);
 				canvas.DrawCircle(cx, cy, range * 1.1f, paint);
 				paint.SetStyle(Paint.Style.Fill!);
-				paint.Color = Color.Argb(150, 255, 255, 255);
+				paint.Color = Color.Argb(A(1.1f), 255, 255, 255);
 				canvas.DrawCircle(cx, cy, range * 0.45f, paint);
 			}
 			else
 			{
 				float r = BtnRadius(i);
 				paint.SetStyle(Paint.Style.Fill!);
-				paint.Color = Color.Argb(110, c[0], c[1], c[2]);
+				paint.Color = Color.Argb(A(0.55f), c[0], c[1], c[2]);
 				canvas.DrawCircle(cx, cy, r, paint);
 				paint.SetStyle(Paint.Style.Stroke!);
 				paint.StrokeWidth = r * 0.12f;
-				paint.Color = Color.Argb(200, c[0], c[1], c[2]);
+				paint.Color = Color.Argb(A(1f), c[0], c[1], c[2]);
 				canvas.DrawCircle(cx, cy, r, paint);
 
 				paint.SetStyle(Paint.Style.Fill!);
-				paint.Color = Color.Argb(230, 255, 255, 255);
+				paint.Color = Color.Argb(A(1.8f), 255, 255, 255);
 				if (i == Pause)
 				{
 					float bw = r * 0.2f, bh = r * 0.8f, gap = r * 0.18f;

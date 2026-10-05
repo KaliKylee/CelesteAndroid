@@ -29,6 +29,9 @@ namespace CelesteAndroid
 	{
 		public const string LogTag = "CelesteAndroid";
 		public const string ExtraDriver = "driver";
+		public const string ExtraShowFps = "show_fps";
+		public const string ExtraHideTouch = "hide_touch";
+		public const string ExtraTouchOpacity = "touch_opacity";
 
 		// O Java carrega SDL3 e FMOD (o FMOD precisa estar carregado antes do FMOD.init);
 		// FNA3D/FAudio são carregados pelo .NET via DllImport.
@@ -65,6 +68,12 @@ namespace CelesteAndroid
 			string? driver = Intent?.GetStringExtra(ExtraDriver);
 			if (!string.IsNullOrEmpty(driver))
 				SDL3.SDL.SDL_SetHint("FNA3D_FORCE_DRIVER", driver);
+
+			// Opções da tela inicial; lidas pelo TouchControls via HostConfig (Celeste.Android.Patches).
+			AppContext.SetData("CelesteAndroid.ShowFps", Intent?.GetBooleanExtra(ExtraShowFps, false) == true ? "1" : "0");
+			AppContext.SetData("CelesteAndroid.HideTouch", Intent?.GetBooleanExtra(ExtraHideTouch, false) == true ? "1" : "0");
+			AppContext.SetData("CelesteAndroid.TouchOpacity",
+				(Intent?.GetIntExtra(ExtraTouchOpacity, GameOptions.DefaultOpacity) ?? GameOptions.DefaultOpacity).ToString(System.Globalization.CultureInfo.InvariantCulture));
 
 			try
 			{

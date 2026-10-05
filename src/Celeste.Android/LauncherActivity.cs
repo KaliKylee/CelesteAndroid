@@ -42,7 +42,7 @@ namespace CelesteAndroid
 		private ImageView art = null!;
 		private TextView subtitle = null!;
 		private TextView byline = null!;
-		private Button customize = null!;
+		private Button optionsButton = null!;
 		private Button langButton = null!;
 		private LinearLayout panel = null!;
 		private TextView status = null!;
@@ -188,11 +188,11 @@ namespace CelesteAndroid
 				GravityFlags.Bottom | GravityFlags.End) { RightMargin = Dp(28), BottomMargin = Dp(14) };
 			root.AddView(credits, creditsParams);
 
-			// Editor dos controles de toque (mover e redimensionar). Fica no canto, fora do painel central.
-			customize = PillButton(L.CustomizeControls, filled: false);
-			customize.SetTextSize(ComplexUnitType.Sp, 13);
-			customize.Click += (_, _) => StartActivity(new Intent(this, typeof(ControlsEditorActivity)));
-			root.AddView(customize, new FrameLayout.LayoutParams(Dp(196), Dp(38), GravityFlags.Top | GravityFlags.End) { TopMargin = Dp(14), RightMargin = Dp(20) });
+			// Menu de opções (editar controles, FPS, botões de toque). Fica no canto, fora do painel central.
+			optionsButton = PillButton("", filled: false);
+			optionsButton.SetTextSize(ComplexUnitType.Sp, 13);
+			optionsButton.Click += (_, _) => ShowOptionsMenu();
+			root.AddView(optionsButton, new FrameLayout.LayoutParams(Dp(150), Dp(38), GravityFlags.Top | GravityFlags.End) { TopMargin = Dp(14), RightMargin = Dp(20) });
 
 			// Seletor de idioma no canto superior esquerdo.
 			langButton = PillButton("", filled: false);
@@ -212,6 +212,33 @@ namespace CelesteAndroid
 			{
 				L.Set(Prefs, L.All[e.Item!.ItemId]);
 				RefreshState();
+				HideSystemBars();
+			};
+			menu.DismissEvent += (_, _) => HideSystemBars();
+			menu.Show();
+		}
+
+		private void ShowOptionsMenu()
+		{
+			const int EditControlsId = 0, ShowFpsId = 1, HideTouchId = 2;
+			var menu = new PopupMenu(this, optionsButton);
+			menu.Menu!.Add(0, EditControlsId, 0, L.EditControls);
+			menu.Menu.Add(0, ShowFpsId, 1, L.ShowFps)!.SetCheckable(true)!.SetChecked(GameOptions.ShowFps(Prefs));
+			menu.Menu.Add(0, HideTouchId, 2, L.HideTouchButtons)!.SetCheckable(true)!.SetChecked(GameOptions.HideTouch(Prefs));
+			menu.MenuItemClick += (_, e) =>
+			{
+				switch (e.Item!.ItemId)
+				{
+					case EditControlsId:
+						StartActivity(new Intent(this, typeof(ControlsEditorActivity)));
+						break;
+					case ShowFpsId:
+						GameOptions.SetShowFps(Prefs, !GameOptions.ShowFps(Prefs));
+						break;
+					case HideTouchId:
+						GameOptions.SetHideTouch(Prefs, !GameOptions.HideTouch(Prefs));
+						break;
+				}
 				HideSystemBars();
 			};
 			menu.DismissEvent += (_, _) => HideSystemBars();
@@ -304,7 +331,7 @@ namespace CelesteAndroid
 			play.Text = L.Play;
 			openZip.Text = L.ImportZip;
 			importSaves.Text = L.ImportSaves;
-			customize.Text = L.CustomizeControls;
+			optionsButton.Text = $"⚙  {L.Options}  ▾";
 			langButton.Text = $"{L.Flag(L.Current)}  {L.Name(L.Current)}  ▾";
 			play.Enabled = installed && !busy;
 			play.Alpha = play.Enabled ? 1f : 0.4f;
@@ -329,6 +356,10 @@ namespace CelesteAndroid
 			string? driver = Prefs.GetString(PrefDriver, "");
 			if (!string.IsNullOrEmpty(driver))
 				intent.PutExtra(GameActivity.ExtraDriver, driver);
+			// O jogo roda em outro processo: as opções vão junto no Intent.
+			intent.PutExtra(GameActivity.ExtraShowFps, GameOptions.ShowFps(Prefs));
+			intent.PutExtra(GameActivity.ExtraHideTouch, GameOptions.HideTouch(Prefs));
+			intent.PutExtra(GameActivity.ExtraTouchOpacity, GameOptions.Opacity(Prefs));
 			StartActivity(intent);
 		}
 

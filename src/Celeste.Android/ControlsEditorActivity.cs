@@ -37,11 +37,19 @@ namespace CelesteAndroid
 		private ControlsCanvas canvas = null!;
 		private TextView label = null!;
 		private SeekBar seek = null!;
+
+		// Só paisagem: qualquer pedido de outra orientação vira paisagem.
+		public override ScreenOrientation RequestedOrientation
+		{
+			get => base.RequestedOrientation;
+			set => base.RequestedOrientation = LandscapeLock.Coerce(value);
+		}
 		private TextView opacityLabel = null!;
 		private SeekBar opacitySeek = null!;
 
 		protected override void OnCreate(Bundle? savedInstanceState)
 		{
+			RequestedOrientation = LandscapeLock.Orientation;
 			base.OnCreate(savedInstanceState);
 			L.Init(GetSharedPreferences("launcher", FileCreationMode.Private)!);
 			SetContentView(BuildLayout());

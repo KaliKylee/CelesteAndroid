@@ -37,8 +37,17 @@ namespace CelesteAndroid
 		// FNA3D/FAudio são carregados pelo .NET via DllImport.
 		protected override string[] GetLibraries() => new[] { "SDL3", "fmod", "fmodstudio" };
 
+		// O SDL pede uma orientação ao criar a janela (antes do hint SDL_ORIENTATIONS valer em Main):
+		// qualquer pedido que não seja paisagem vira paisagem, para a tela nunca ficar em pé.
+		public override ScreenOrientation RequestedOrientation
+		{
+			get => base.RequestedOrientation;
+			set => base.RequestedOrientation = LandscapeLock.Coerce(value);
+		}
+
 		protected override void OnCreate(Bundle? savedInstanceState)
 		{
+			RequestedOrientation = LandscapeLock.Orientation;
 			base.OnCreate(savedInstanceState);
 			// O FMOD no Android precisa do Context para o áudio e para ler arquivos.
 			Org.Fmod.FMOD.Init(this);

@@ -57,10 +57,19 @@ namespace CelesteAndroid
 		private TextView progressText = null!;
 		private bool busy;
 
+		// Só paisagem: qualquer pedido de outra orientação vira paisagem.
+		public override ScreenOrientation RequestedOrientation
+		{
+			get => base.RequestedOrientation;
+			set => base.RequestedOrientation = LandscapeLock.Coerce(value);
+		}
+
 		private ISharedPreferences Prefs => GetSharedPreferences("launcher", FileCreationMode.Private)!;
 
 		protected override void OnCreate(Bundle? savedInstanceState)
 		{
+			// Trava a paisagem antes de qualquer outra coisa (o manifest já declara, isto é o reforço).
+			RequestedOrientation = LandscapeLock.Orientation;
 			base.OnCreate(savedInstanceState);
 			L.Init(Prefs);
 			SetContentView(BuildLayout());

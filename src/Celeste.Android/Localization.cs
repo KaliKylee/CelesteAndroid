@@ -87,9 +87,24 @@ namespace CelesteAndroid
 
 		// ---- Editor de controles ----
 		public static string EditorHint => T(
-			"Arraste os controles para mudar de lugar. Use as barras para mudar o tamanho e a opacidade.",
-			"Drag the controls to move them. Use the sliders to change size and opacity.",
-			"Arrastra los controles para moverlos. Usa las barras para cambiar el tamaño y la opacidad.");
+			"Arraste os controles para mudar de lugar. Use as barras para mudar o tamanho e a opacidade, e a grade para alinhar.",
+			"Drag the controls to move them. Use the sliders to change size and opacity, and the grid to align.",
+			"Arrastra los controles para moverlos. Usa las barras para cambiar el tamaño y la opacidad, y la cuadrícula para alinear.");
+		/// <summary>Texto do botão de grade do editor: 0 = desligada, 1..3 = tamanho da célula.</summary>
+		public static string GridLabel(int mode) => mode switch
+		{
+			1 => T("Grade: grande", "Grid: large", "Cuadrícula: grande"),
+			2 => T("Grade: média", "Grid: medium", "Cuadrícula: media"),
+			3 => T("Grade: fina", "Grid: fine", "Cuadrícula: fina"),
+			_ => T("Grade: desligada", "Grid: off", "Cuadrícula: apagada"),
+		};
+		/// <summary>Cantos do contador de FPS, na ordem do índice (bit 0 = direita, bit 1 = baixo).</summary>
+		public static string[] FpsCorners => Current switch
+		{
+			Lang.Pt => new[] { "FPS ↖ Sup. esq.", "FPS ↗ Sup. dir.", "FPS ↙ Inf. esq.", "FPS ↘ Inf. dir." },
+			Lang.Es => new[] { "FPS ↖ Sup. izq.", "FPS ↗ Sup. der.", "FPS ↙ Inf. izq.", "FPS ↘ Inf. der." },
+			_ => new[] { "FPS ↖ Top left", "FPS ↗ Top right", "FPS ↙ Bottom left", "FPS ↘ Bottom right" },
+		};
 		public static string Opacity => T("Opacidade", "Opacity", "Opacidad");
 		public static string Reset => T("Resetar", "Reset", "Restablecer");
 		public static string Cancel => T("Cancelar", "Cancel", "Cancelar");

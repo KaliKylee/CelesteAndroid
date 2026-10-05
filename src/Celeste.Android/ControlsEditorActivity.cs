@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -47,6 +48,15 @@ namespace CelesteAndroid
 		private TextView opacityLabel = null!;
 		private SeekBar opacitySeek = null!;
 
+		// Grade de alinhamento (só no editor, vale também para o contador de FPS) e posição do FPS.
+		private const string PrefGrid = "editor_grid";
+		private int gridMode;
+		private Button gridButton = null!;
+		private LinearLayout fpsRow = null!;
+		private Button fpsCornerButton = null!;
+		private TextView fpsXLabel = null!, fpsYLabel = null!;
+		private SeekBar fpsXSeek = null!, fpsYSeek = null!;
+
 		protected override void OnCreate(Bundle? savedInstanceState)
 		{
 			RequestedOrientation = LandscapeLock.Orientation;
@@ -78,7 +88,11 @@ namespace CelesteAndroid
 
 			canvas = new ControlsCanvas(this, GameInstaller.TouchLayoutFile(this));
 			canvas.OpacityPercent = GameOptions.Opacity(GameOptions.Prefs(this));
+			canvas.FpsEnabled = GameOptions.ShowFps(GameOptions.Prefs(this)); // sem "Mostrar FPS" ligado não há contador para posicionar
+			gridMode = Math.Clamp(GameOptions.Prefs(this).GetInt(PrefGrid, 0), 0, 3);
+			canvas.GridMode = gridMode;
 			canvas.SelectionChanged = UpdateBar;
+			canvas.FpsChanged = UpdateFpsRow;
 			root.AddView(canvas, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
 			// Barra no topo, no meio: os controles ficam nos cantos e na parte de baixo.
@@ -149,9 +163,41 @@ namespace CelesteAndroid
 				UpdateLabel();
 			};
 			opacityRow.AddView(opacitySeek, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
-			// Mesmo espaço dos botões da linha de cima, para as duas barras ficarem alinhadas.
-			opacityRow.AddView(new View(this), new LinearLayout.LayoutParams(Dp(8 + 74 + 6 + 78 + 6 + 70), 1));
+			// Mesmo espaço dos botões da linha de cima (8 + 74 + 6 + 78 + 6 + 70), para as duas barras ficarem alinhadas:
+			// ali fica o botão da grade, que alterna desligada / grande / média / fina.
+			gridButton = MakeButton(L.GridLabel(gridMode), filled: false);
+			gridButton.Click += (_, _) =>
+			{
+				gridMode = (gridMode + 1) % 4;
+				canvas.GridMode = gridMode;
+				gridButton.Text = L.GridLabel(gridMode);
+				GameOptions.Prefs(this).Edit()!.PutInt(PrefGrid, gridMode)!.Apply();
+			};
+			opacityRow.AddView(gridButton, new LinearLayout.LayoutParams(Dp(74 + 6 + 78 + 6 + 70), Dp(36)) { LeftMargin = Dp(8) });
 			bar.AddView(opacityRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+			// Posição do contador de FPS: canto + margem X e Y (distância até a borda). Também dá para arrastá-lo na tela.
+			fpsRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+			fpsRow.SetGravity(GravityFlags.CenterVertical);
+			fpsCornerButton = MakeButton("", filled: false);
+			fpsCornerButton.Click += (_, _) =>
+			{
+				canvas.SelectItem(ControlsCanvas.Fps);
+				canvas.FpsCorner = (canvas.FpsCorner + 1) % 4;
+			};
+			fpsRow.AddView(fpsCornerButton, new LinearLayout.LayoutParams(Dp(132), Dp(34)));
+			fpsXLabel = Text("", 12, Color.White, true);
+			fpsXLabel.Gravity = GravityFlags.Right | GravityFlags.CenterVertical;
+			fpsRow.AddView(fpsXLabel, new LinearLayout.LayoutParams(Dp(58), ViewGroup.LayoutParams.WrapContent) { LeftMargin = Dp(6) });
+			fpsXSeek = MakeFpsSeek(x: true);
+			fpsRow.AddView(fpsXSeek, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+			fpsYLabel = Text("", 12, Color.White, true);
+			fpsYLabel.Gravity = GravityFlags.Right | GravityFlags.CenterVertical;
+			fpsRow.AddView(fpsYLabel, new LinearLayout.LayoutParams(Dp(58), ViewGroup.LayoutParams.WrapContent));
+			fpsYSeek = MakeFpsSeek(x: false);
+			fpsRow.AddView(fpsYSeek, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+			fpsRow.Visibility = canvas.FpsEnabled ? ViewStates.Visible : ViewStates.Gone;
+			bar.AddView(fpsRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(2) });
 
 			int barWidth = Math.Min(Dp(620), Resources!.DisplayMetrics!.WidthPixels - Dp(190));
 			root.AddView(bar, new FrameLayout.LayoutParams(barWidth, ViewGroup.LayoutParams.WrapContent, GravityFlags.Top | GravityFlags.CenterHorizontal) { TopMargin = Dp(8) });
@@ -164,11 +210,47 @@ namespace CelesteAndroid
 			seek.Progress = (int)Math.Round((canvas.SelectedScale - 0.5f) * 100f);
 			opacitySeek.Progress = canvas.OpacityPercent;
 			UpdateLabel();
+			UpdateFpsRow();
+		}
+
+		/// <summary>Margem do FPS: 0..50% da tela em passos de 0,1%.</summary>
+		private SeekBar MakeFpsSeek(bool x)
+		{
+			var s = new SeekBar(this) { Max = 500 };
+			s.ProgressTintList = Android.Content.Res.ColorStateList.ValueOf(Accent);
+			s.ThumbTintList = Android.Content.Res.ColorStateList.ValueOf(Accent);
+			s.ProgressChanged += (_, e) =>
+			{
+				if (!e.FromUser)
+					return;
+				canvas.SelectItem(ControlsCanvas.Fps);
+				if (x)
+					canvas.FpsMx = e.Progress / 1000f;
+				else
+					canvas.FpsMy = e.Progress / 1000f;
+			};
+			return s;
+		}
+
+		/// <summary>Sincroniza canto e margens do FPS com o canvas (também chamado quando o FPS é arrastado).</summary>
+		private void UpdateFpsRow()
+		{
+			if (fpsRow == null)
+				return;
+			fpsCornerButton.Text = L.FpsCorners[canvas.FpsCorner];
+			int px = (int)Math.Round(canvas.FpsMx * 1000f), py = (int)Math.Round(canvas.FpsMy * 1000f);
+			if (fpsXSeek.Progress != px)
+				fpsXSeek.Progress = px;
+			if (fpsYSeek.Progress != py)
+				fpsYSeek.Progress = py;
+			fpsXLabel.Text = string.Format(CultureInfo.InvariantCulture, "X {0:0.0}%", px / 10f);
+			fpsYLabel.Text = string.Format(CultureInfo.InvariantCulture, "Y {0:0.0}%", py / 10f);
 		}
 
 		private void UpdateLabel()
 		{
-			label.Text = $"{ControlsCanvas.Names[canvas.Selected]}: {(int)Math.Round(canvas.SelectedScale * 100f)}%";
+			string name = canvas.Selected == ControlsCanvas.Fps ? "FPS" : ControlsCanvas.Names[canvas.Selected];
+			label.Text = $"{name}: {(int)Math.Round(canvas.SelectedScale * 100f)}%";
 			opacityLabel.Text = $"{L.Opacity}: {canvas.OpacityPercent}%";
 		}
 
@@ -229,7 +311,8 @@ namespace CelesteAndroid
 	/// <summary>Desenha os controles na mesma geometria do TouchControls e deixa arrastá-los.</summary>
 	internal sealed class ControlsCanvas : View
 	{
-		public const int Stick = 0, Jump = 1, Dash = 2, Grab = 3, Pause = 4, Tab = 5, Count = 6;
+		// Count = botões/analógico com posição própria; Fps (= Count) é o contador de FPS, que tem canto + margens em vez de x/y.
+		public const int Stick = 0, Jump = 1, Dash = 2, Grab = 3, Pause = 4, Tab = 5, Count = 6, Fps = 6;
 
 		public static string[] Names => L.ControlNames;
 		private static readonly string[] Keys = { "stick", "jump", "dash", "grab", "pause", "tab" };
@@ -249,12 +332,59 @@ namespace CelesteAndroid
 		private readonly string path;
 		private readonly float[] fx = new float[Count];
 		private readonly float[] fy = new float[Count];
-		private readonly float[] scale = new float[Count];
+		private readonly float[] scale = new float[Count + 1]; // o último é a escala do texto do FPS
 		private readonly Paint paint = new(PaintFlags.AntiAlias);
 		private bool ready;
 		private bool isDefault = true;
 		private bool dragging;
 		private float dragDx, dragDy;
+
+		// ---- Contador de FPS: canto (bit 0 = direita, bit 1 = baixo) e margens em fração da largura/altura ----
+		private int fpsCorner;
+		private float fpsMx, fpsMy;
+
+		/// <summary>Só mostra/permite arrastar o FPS se a opção "Mostrar FPS" estiver ligada.</summary>
+		public bool FpsEnabled { get; set; }
+		public Action? FpsChanged { get; set; }
+
+		public int FpsCorner
+		{
+			get => fpsCorner;
+			set { fpsCorner = Math.Clamp(value, 0, 3); isDefault = false; ClampFps(); Invalidate(); }
+		}
+
+		public float FpsMx
+		{
+			get => fpsMx;
+			set { fpsMx = value; isDefault = false; ClampFps(); Invalidate(); }
+		}
+
+		public float FpsMy
+		{
+			get => fpsMy;
+			set { fpsMy = value; isDefault = false; ClampFps(); Invalidate(); }
+		}
+
+		private int gridMode;
+
+		/// <summary>Grade de alinhamento: 0 = desligada; 1, 2, 3 = 12, 24, 48 células na altura. Os itens "grudam" nela ao serem arrastados.</summary>
+		public int GridMode
+		{
+			get => gridMode;
+			set { gridMode = Math.Clamp(value, 0, 3); Invalidate(); }
+		}
+
+		private float GridStep => gridMode switch { 1 => Height / 12f, 2 => Height / 24f, 3 => Height / 48f, _ => 0f };
+		private float Snap(float v) => GridStep > 0f ? MathF.Round(v / GridStep) * GridStep : v;
+
+		public void SelectItem(int i)
+		{
+			if (Selected == i)
+				return;
+			Selected = i;
+			SelectionChanged?.Invoke();
+			Invalidate();
+		}
 
 		public int Selected { get; private set; } = Stick;
 		public Action? SelectionChanged { get; set; }
@@ -280,7 +410,7 @@ namespace CelesteAndroid
 		public ControlsCanvas(Context context, string path) : base(context)
 		{
 			this.path = path;
-			for (int i = 0; i < Count; i++)
+			for (int i = 0; i <= Count; i++)
 				scale[i] = 1f;
 		}
 
@@ -296,6 +426,42 @@ namespace CelesteAndroid
 		private float BtnRadius(int i) => (i == Pause ? 0.32f : i == Tab ? 0.4f : 0.5f) * Unit * scale[i];
 		private float StickRange => Height * StickRadius * scale[Stick];
 		private float VisibleRadius(int i) => i == Stick ? StickRange * 1.1f : BtnRadius(i);
+		// Mesma geometria do TouchControls.DrawFps: célula = 0,45% da altura * escala; "60 FPS" = 6 caracteres de 6 células (sem o espaço final) x 7 de altura.
+		private float FpsCell => Math.Max(2f, Height * 0.0045f) * scale[Fps];
+		private float FpsW => (6 * 6f - 1f) * FpsCell;
+		private float FpsH => 7f * FpsCell;
+
+		private RectF FpsRect()
+		{
+			float w = FpsW, h = FpsH;
+			float x = (fpsCorner & 1) == 1 ? Width - fpsMx * Width - w : fpsMx * Width;
+			float y = (fpsCorner & 2) == 2 ? Height - fpsMy * Height - h : fpsMy * Height;
+			return new RectF(x, y, x + w, y + h);
+		}
+
+		/// <summary>Mantém o texto do FPS inteiro dentro da tela.</summary>
+		private void ClampFps()
+		{
+			if (Width <= 0 || Height <= 0)
+				return;
+			fpsMx = Math.Clamp(fpsMx, 0f, Math.Max(0f, Math.Min(0.5f, (Width - FpsW) / Width)));
+			fpsMy = Math.Clamp(fpsMy, 0f, Math.Max(0f, Math.Min(0.5f, (Height - FpsH) / Height)));
+			FpsChanged?.Invoke();
+		}
+
+		/// <summary>Arrastando: o canto é o mais próximo do centro do texto; as margens são a distância até as bordas desse canto.</summary>
+		private void MoveFps(float cx, float cy)
+		{
+			float w = FpsW, h = FpsH;
+			fpsCorner = (cx > Width / 2f ? 1 : 0) | (cy > Height / 2f ? 2 : 0);
+			float mxPx = (fpsCorner & 1) == 1 ? Width - (cx + w / 2f) : cx - w / 2f;
+			float myPx = (fpsCorner & 2) == 2 ? Height - (cy + h / 2f) : cy - h / 2f;
+			fpsMx = Snap(mxPx) / Width;
+			fpsMy = Snap(myPx) / Height;
+			isDefault = false;
+			ClampFps();
+		}
+
 		private float HitRadius(int i) => i == Stick ? StickRange * 1.1f : BtnRadius(i) * 1.25f;
 
 		protected override void OnSizeChanged(int w, int h, int oldw, int oldh)
@@ -319,8 +485,12 @@ namespace CelesteAndroid
 			Place(Grab, w - 2.15f * u, h - 2.35f * u);
 			Place(Pause, w - 0.8f * u, 0.8f * u);
 			Place(Tab, w - 1.75f * u, 0.8f * u);
-			for (int i = 0; i < Count; i++)
+			for (int i = 0; i <= Count; i++)
 				scale[i] = 1f;
+			// FPS: canto superior esquerdo, margem de 3 células (igual ao padrão do TouchControls).
+			fpsCorner = 0;
+			fpsMx = Math.Max(2f, h * 0.0045f) * 3f / w;
+			fpsMy = Math.Max(2f, h * 0.0045f) * 3f / h;
 			isDefault = true;
 		}
 
@@ -347,6 +517,24 @@ namespace CelesteAndroid
 					string[] kv = line.Split('=');
 					if (kv.Length != 2)
 						continue;
+					if (kv[0].Trim() == "fps")
+					{
+						// fps=canto,mx,my,escala
+						string[] fv = kv[1].Split(',');
+						if (fv.Length == 4
+							&& int.TryParse(fv[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int corner)
+							&& float.TryParse(fv[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float mx)
+							&& float.TryParse(fv[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float my)
+							&& float.TryParse(fv[3], NumberStyles.Float, CultureInfo.InvariantCulture, out float fs))
+						{
+							fpsCorner = Math.Clamp(corner, 0, 3);
+							fpsMx = Math.Clamp(mx, 0f, 0.5f);
+							fpsMy = Math.Clamp(my, 0f, 0.5f);
+							scale[Fps] = Math.Clamp(fs, 0.5f, 2f);
+							isDefault = false;
+						}
+						continue;
+					}
 					int idx = Array.IndexOf(Keys, kv[0].Trim());
 					string[] v = kv[1].Split(',');
 					if (idx < 0 || v.Length != 3)
@@ -381,6 +569,7 @@ namespace CelesteAndroid
 				var sb = new StringBuilder();
 				for (int i = 0; i < Count; i++)
 					sb.Append(string.Format(CultureInfo.InvariantCulture, "{0}={1:0.0000},{2:0.0000},{3:0.00}\n", Keys[i], fx[i], fy[i], scale[i]));
+				sb.Append(string.Format(CultureInfo.InvariantCulture, "fps={0},{1:0.0000},{2:0.0000},{3:0.00}\n", fpsCorner, fpsMx, fpsMy, scale[Fps]));
 				File.WriteAllText(path, sb.ToString());
 			}
 			catch (Exception)
@@ -398,6 +587,11 @@ namespace CelesteAndroid
 
 		private void ClampSelected()
 		{
+			if (Selected == Fps)
+			{
+				ClampFps();
+				return;
+			}
 			float m = VisibleRadius(Selected);
 			float px = Math.Clamp(fx[Selected] * Width, m, Math.Max(m, Width - m));
 			float py = Math.Clamp(fy[Selected] * Height, m, Math.Max(m, Height - m));
@@ -411,8 +605,72 @@ namespace CelesteAndroid
 			base.OnDraw(canvas);
 			if (canvas == null || !ready)
 				return;
+			DrawGrid(canvas);
+			if (FpsEnabled)
+				DrawFpsItem(canvas);
 			for (int i = 0; i < Count; i++)
 				DrawItem(canvas, i);
+		}
+
+		private void DrawGrid(Canvas canvas)
+		{
+			float g = GridStep;
+			if (g <= 0f)
+				return;
+			paint.SetStyle(Paint.Style.Stroke!);
+			paint.StrokeWidth = Math.Max(1f, Dp(0.75f));
+			// Uma linha mais forte a cada 4 células, para contar com o olho.
+			for (int k = 0; k * g <= Width; k++)
+			{
+				paint.Color = Color.Argb(k % 4 == 0 ? 80 : 34, 255, 255, 255);
+				canvas.DrawLine(k * g, 0, k * g, Height, paint);
+			}
+			for (int k = 0; k * g <= Height; k++)
+			{
+				paint.Color = Color.Argb(k % 4 == 0 ? 80 : 34, 255, 255, 255);
+				canvas.DrawLine(0, k * g, Width, k * g, paint);
+			}
+		}
+
+		// Fonte 5x7 igual à do TouchControls (só os caracteres de "60 FPS").
+		private static readonly Dictionary<char, string[]> FpsGlyphs = new()
+		{
+			['6'] = new[] { "00110", "01000", "10000", "11110", "10001", "10001", "01110" },
+			['0'] = new[] { "01110", "10001", "10011", "10101", "11001", "10001", "01110" },
+			['F'] = new[] { "11111", "10000", "10000", "11110", "10000", "10000", "10000" },
+			['P'] = new[] { "11110", "10001", "10001", "11110", "10000", "10000", "10000" },
+			['S'] = new[] { "01111", "10000", "10000", "01110", "00001", "00001", "11110" },
+		};
+
+		private void DrawFpsGlyphs(Canvas canvas, float left, float top, float c, Color color)
+		{
+			paint.SetStyle(Paint.Style.Fill!);
+			paint.Color = color;
+			float x = left;
+			foreach (char ch in "60 FPS")
+			{
+				if (FpsGlyphs.TryGetValue(ch, out string[]? rows))
+					for (int y = 0; y < rows.Length; y++)
+						for (int col = 0; col < rows[y].Length; col++)
+							if (rows[y][col] == '1')
+								canvas.DrawRect(x + col * c, top + y * c, x + (col + 1) * c, top + (y + 1) * c, paint);
+				x += c * 6f;
+			}
+		}
+
+		private void DrawFpsItem(Canvas canvas)
+		{
+			RectF r = FpsRect();
+			float c = FpsCell;
+			DrawFpsGlyphs(canvas, r.Left + c * 0.5f, r.Top + c * 0.5f, c, Color.Argb(190, 0, 0, 0)); // sombra, como no jogo
+			DrawFpsGlyphs(canvas, r.Left, r.Top, c, Color.White);
+
+			// Moldura: forte quando selecionado, discreta senão (mostra onde tocar para arrastar).
+			float pad = Dp(6);
+			paint.SetStyle(Paint.Style.Stroke!);
+			paint.StrokeWidth = Dp(Selected == Fps ? 3 : 1.5f);
+			paint.Color = Selected == Fps ? Color.ParseColor("#F2B8D8") : Color.Argb(110, 255, 255, 255);
+			canvas.DrawRoundRect(new RectF(r.Left - pad, r.Top - pad, r.Right + pad, r.Bottom + pad), Dp(6), Dp(6), paint);
 		}
 
 		/// <summary>Opacidade dos botões pixel art: mesma curva do TouchControls.ButtonOpacity (45% vira 90%, 100% fica sólido).</summary>
@@ -519,6 +777,14 @@ namespace CelesteAndroid
 					best = i;
 				}
 			}
+			// O FPS fica por último: onde ele encosta num botão, o botão tem prioridade.
+			if (best < 0 && FpsEnabled)
+			{
+				RectF r = FpsRect();
+				float pad = Dp(14);
+				if (x >= r.Left - pad && x <= r.Right + pad && y >= r.Top - pad && y <= r.Bottom + pad)
+					return Fps;
+			}
 			return best;
 		}
 
@@ -535,8 +801,17 @@ namespace CelesteAndroid
 						return true;
 					Selected = hit;
 					dragging = true;
-					dragDx = fx[hit] * Width - e.GetX();
-					dragDy = fy[hit] * Height - e.GetY();
+					if (hit == Fps)
+					{
+						RectF r = FpsRect();
+						dragDx = (r.Left + r.Right) / 2f - e.GetX();
+						dragDy = (r.Top + r.Bottom) / 2f - e.GetY();
+					}
+					else
+					{
+						dragDx = fx[hit] * Width - e.GetX();
+						dragDy = fy[hit] * Height - e.GetY();
+					}
 					SelectionChanged?.Invoke();
 					Invalidate();
 					return true;
@@ -544,10 +819,17 @@ namespace CelesteAndroid
 				case MotionEventActions.Move:
 					if (dragging)
 					{
-						fx[Selected] = (e.GetX() + dragDx) / Width;
-						fy[Selected] = (e.GetY() + dragDy) / Height;
-						isDefault = false;
-						ClampSelected();
+						float px = e.GetX() + dragDx, py = e.GetY() + dragDy;
+						if (Selected == Fps)
+							MoveFps(px, py);
+						else
+						{
+							// Com a grade ligada o centro do botão "gruda" no cruzamento mais próximo.
+							fx[Selected] = Snap(px) / Width;
+							fy[Selected] = Snap(py) / Height;
+							isDefault = false;
+							ClampSelected();
+						}
 						Invalidate();
 					}
 					return true;

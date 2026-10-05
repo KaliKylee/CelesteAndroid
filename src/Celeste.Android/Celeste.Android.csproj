@@ -9,38 +9,26 @@
 		<ApplicationVersion>3</ApplicationVersion>
 		<ApplicationDisplayVersion>1.0.1</ApplicationDisplayVersion>
 		<RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>
-		<!-- APK instalável via adb install mesmo em Debug (sem Fast Deployment). -->
 		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
 		<AndroidPackageFormat>apk</AndroidPackageFormat>
-		<!-- O Celeste (carregado em runtime) usa reflexão e XmlSerializer sobre o framework inteiro,
-		     inclusive as fachadas do .NET Framework (mscorlib, System.Xml): nada pode ser removido. -->
 		<PublishTrimmed>false</PublishTrimmed>
 		<AndroidLinkMode>None</AndroidLinkMode>
-		<!-- AOT exige trimming; o jogo (Celeste.dll) é carregado em runtime e roda no JIT de qualquer forma. -->
 		<RunAOTCompilation>false</RunAOTCompilation>
-		<!-- Sem AOT/trimming, os "marshal methods" do Release não geram os stubs nativos
-		     (UnsatisfiedLinkError em n_onCreate); usa o registro dinâmico, como no Debug. -->
 		<AndroidEnableMarshalMethods>false</AndroidEnableMarshalMethods>
-		<!-- Os bindings gerados do Java do SDL não seguem nossas regras de nulabilidade. -->
 		<NoWarn>$(NoWarn);CS8618;CS8625;CS8766;CS1572;BG8A04;BG8A00;BG8403</NoWarn>
 	</PropertyGroup>
 	<PropertyGroup>
-		<!-- Arte extraída dos arquivos do jogo do usuário por scripts/generate-game-art.ps1 (fora do git). -->
 		<GameArtDir>$(MSBuildThisFileDirectory)GameArt\</GameArtDir>
-		<!-- Ícone (todas as builds, se gerado) e arte do launcher/logo (-p:UseGameArt=false a remove: build público). -->
 		<HasGameIcon Condition="Exists('$(GameArtDir)icon\res\mipmap-xxxhdpi\ic_celeste.png')">true</HasGameIcon>
 		<HasGameArt Condition="'$(UseGameArt)' != 'false' and Exists('$(GameArtDir)art\res')">true</HasGameArt>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(AndroidSigningKeyStore)' != ''">
-		<!-- Assinatura de release: passada pelo scripts/build-release.ps1, nunca commitada. -->
 		<AndroidKeyStore>true</AndroidKeyStore>
 	</PropertyGroup>
 	<ItemGroup>
-		<!-- Java do SDL3 (SDLActivity etc.), compilado no APK e com bindings C# para subclassificar. -->
 		<AndroidJavaSource Include="$(RepoRoot)external\SDL\android-project\app\src\main\java\org\libsdl\app\*.java" Bind="true" />
 		<TransformFile Include="Transforms\Metadata.xml" />
 		<AndroidNativeLibrary Include="$(RepoRoot)natives\android-arm64\*.so" Abi="arm64-v8a" />
-		<!-- FMOD 1.10.14 (mesma versão dos .bank do jogo). Proprietário: fica fora do git. -->
 		<AndroidNativeLibrary Include="$(RepoRoot)fmod\libs\android-arm64\*.so" Abi="arm64-v8a" />
 		<AndroidLibrary Include="$(RepoRoot)fmod\libs\android-arm64\fmod.jar" Bind="true" />
 	</ItemGroup>
@@ -61,26 +49,20 @@
 	<ItemGroup>
 		<None Remove="ResourceAliases\**" />
 	</ItemGroup>
-	<!-- -p:EmbedGame=true: APK pessoal com o jogo do usuário dentro (instala sozinho; NUNCA distribuir). -->
 	<ItemGroup Condition="'$(EmbedGame)' == 'true'">
 		<AndroidAsset Include="$(CelesteGameDir)Celeste.exe" LogicalName="game/Celeste.exe" />
 		<AndroidAsset Include="$(CelesteGameDir)Content\**\*" LogicalName="game/Content/%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
 	<ItemGroup>
-		<!-- Arte pixel art dos botões de toque, compartilhada com o módulo de patches (sem dependências). -->
 		<Compile Include="..\Celeste.Android.Patches\PixelButtonArt.cs" Link="PixelButtonArt.cs" />
 	</ItemGroup>
 	<ItemGroup>
 		<ProjectReference Include="..\..\external\FNA\FNA.Core.csproj" />
 		<ProjectReference Include="..\Steamworks.NET\Steamworks.NET.csproj" />
 		<ProjectReference Include="..\Celeste.Patcher\Celeste.Patcher.csproj" />
-		<!-- Só para compilar antes; o .dll vai como asset (ver _AddPatcherAssets). -->
 		<ProjectReference Include="..\Celeste.Android.Patches\Celeste.Android.Patches.csproj"
 			ReferenceOutputAssembly="false" OutputItemType="CelestePatchModule" />
 	</ItemGroup>
-
-	<!-- O patch roda no aparelho: o MonoMod precisa do módulo de patches e das DLLs que o
-	     Celeste.dll gerado referencia (FNA, Steamworks.NET) como arquivos, não do assembly store. -->
 	<Target Name="_AddPatcherAssets" BeforeTargets="_ComputeAndroidAssetsPaths">
 		<ItemGroup>
 			<AndroidAsset Include="@(CelestePatchModule)" LogicalName="patcher/%(Filename)%(Extension)" />

@@ -16,9 +16,6 @@ using Uri = Android.Net.Uri;
 
 namespace CelesteAndroid
 {
-	/// <summary>
-	/// Tela inicial: key art do jogo, importação dos arquivos do jogo e botão de jogar.
-	/// </summary>
 	[Activity(
 		Name = "org.celesteandroid.celeste.LauncherActivity",
 		Label = "Celeste",
@@ -56,7 +53,6 @@ namespace CelesteAndroid
 		private TextView progressText = null!;
 		private bool busy;
 
-		// Só paisagem: qualquer pedido de outra orientação vira paisagem.
 		public override ScreenOrientation RequestedOrientation
 		{
 			get => base.RequestedOrientation;
@@ -67,7 +63,6 @@ namespace CelesteAndroid
 
 		protected override void OnCreate(Bundle? savedInstanceState)
 		{
-			// Trava a paisagem antes de qualquer outra coisa (o manifest já declara, isto é o reforço).
 			RequestedOrientation = LandscapeLock.Orientation;
 			base.OnCreate(savedInstanceState);
 			L.Init(Prefs);
@@ -75,7 +70,6 @@ namespace CelesteAndroid
 			HideSystemBars();
 			LoadArt();
 
-			// "Splash": a arte aparece sozinha e o painel entra logo depois.
 			panel.Alpha = 0f;
 			panel.TranslationY = Dp(24);
 			panel.Animate()!.Alpha(1f).TranslationY(0f).SetStartDelay(650).SetDuration(550)
@@ -97,14 +91,11 @@ namespace CelesteAndroid
 			HideSystemBars();
 			RefreshState();
 
-			// Desenvolvimento: arquivos já copiados por scripts/deploy-android.ps1; só patch + fundo.
-			// adb shell am start -n org.celesteandroid.celeste/.LauncherActivity --ez repatch true
 			if (!busy && Intent!.GetBooleanExtra("repatch", false))
 			{
 				Intent.RemoveExtra("repatch");
 				RunInstall(_ => { });
 			}
-			// APK pessoal: o jogo já vem dentro do APK; instala sozinho na primeira abertura.
 			else if (!busy && !GameInstaller.IsInstalled(this) && GameInstaller.HasEmbeddedGame(this))
 			{
 				RunInstall(installer => installer.ImportEmbedded());
@@ -122,7 +113,6 @@ namespace CelesteAndroid
 			art.SetScaleType(ImageView.ScaleType.CenterCrop);
 			root.AddView(art, Match());
 
-			// Escurece a arte por igual, para o texto e os botões (no centro) ficarem legíveis.
 			var shade = new View(this) { Background = new ColorDrawable(Color.Argb(130, 18, 12, 34)) };
 			root.AddView(shade, Match());
 
@@ -131,7 +121,6 @@ namespace CelesteAndroid
 			panel.SetPadding(Dp(24), Dp(12), Dp(24), Dp(12));
 			root.AddView(panel, new FrameLayout.LayoutParams(Dp(460), ViewGroup.LayoutParams.MatchParent, GravityFlags.Center));
 
-			// Logo: Resources/drawable-nodpi/launcher_logo.png
 			var logo = new ImageView(this);
 			logo.SetImageResource(Resource.Drawable.launcher_logo);
 			logo.SetScaleType(ImageView.ScaleType.FitCenter);
@@ -179,7 +168,6 @@ namespace CelesteAndroid
 			progressBox.AddView(progressText, Margins(top: 6));
 			panel.AddView(progressBox, Margins(top: 12));
 
-			// Créditos no canto inferior direito: autor do port + link do Discord.
 			var credits = new LinearLayout(this) { Orientation = Orientation.Vertical };
 			credits.SetGravity(GravityFlags.End);
 			byline = Text(L.PortBy + " Kali Kyle", 13, Color.Argb(220, 255, 255, 255), TypefaceStyle.Bold);
@@ -196,13 +184,11 @@ namespace CelesteAndroid
 				GravityFlags.Bottom | GravityFlags.End) { RightMargin = Dp(28), BottomMargin = Dp(14) };
 			root.AddView(credits, creditsParams);
 
-			// Menu de opções (editar controles, FPS, botões de toque). Fica no canto, fora do painel central.
 			optionsButton = PillButton("", filled: false);
 			optionsButton.SetTextSize(ComplexUnitType.Sp, 13);
 			optionsButton.Click += (_, _) => ShowOptionsMenu();
 			root.AddView(optionsButton, new FrameLayout.LayoutParams(Dp(150), Dp(38), GravityFlags.Top | GravityFlags.End) { TopMargin = Dp(14), RightMargin = Dp(20) });
 
-			// Seletor de idioma no canto superior esquerdo.
 			langButton = PillButton("", filled: false);
 			langButton.SetTextSize(ComplexUnitType.Sp, 13);
 			langButton.Click += (_, _) => ShowLanguageMenu();
@@ -255,7 +241,6 @@ namespace CelesteAndroid
 
 		private void LoadArt()
 		{
-			// Fundo da tela inicial: Resources/drawable-nodpi/launcher_bg.jpg
 			art.SetImageResource(Resource.Drawable.launcher_bg);
 		}
 
@@ -315,7 +300,6 @@ namespace CelesteAndroid
 		{
 			if (!OperatingSystem.IsAndroidVersionAtLeast(30))
 				return;
-			// A partir do Android 15 o app já é edge-to-edge por padrão.
 			if (!OperatingSystem.IsAndroidVersionAtLeast(35))
 				Window!.SetDecorFitsSystemWindows(false);
 			IWindowInsetsController? insets = Window!.InsetsController;
@@ -333,7 +317,6 @@ namespace CelesteAndroid
 		private void RefreshState()
 		{
 			bool installed = GameInstaller.IsInstalled(this);
-			// Textos que dependem do idioma.
 			subtitle.Text = L.Subtitle;
 			byline.Text = L.PortBy + " Kali Kyle";
 			play.Text = L.Play;
@@ -346,7 +329,6 @@ namespace CelesteAndroid
 			openFolder.Enabled = !busy;
 			openZip.Enabled = !busy;
 			importSaves.Enabled = !busy;
-			// A tela é baixa (~360dp): durante a instalação a barra de progresso ocupa o lugar dos links.
 			links.Visibility = busy ? ViewStates.Gone : ViewStates.Visible;
 			openFolder.Text = installed ? L.ChangeFiles : L.SelectFiles;
 			if (!busy)
@@ -360,17 +342,14 @@ namespace CelesteAndroid
 
 		private void Play()
 		{
-			// Se a partida anterior com Vulkan travou ao iniciar, troca para OpenGL ES e avisa.
 			if (GraphicsDriver.PrepareLaunch(this, Prefs))
 			{
 				Toast.MakeText(this, L.GraphicsFallback, ToastLength.Long)?.Show();
 				RefreshState();
 			}
 			var intent = new Intent(this, typeof(GameActivity));
-			// Vulkan é o padrão do FNA3D: só o OpenGL ES precisa ser forçado.
 			if (GraphicsDriver.Effective(Prefs) == GraphicsDriver.OpenGL)
 				intent.PutExtra(GameActivity.ExtraDriver, GraphicsDriver.OpenGL);
-			// O jogo roda em outro processo: as opções vão junto no Intent.
 			intent.PutExtra(GameActivity.ExtraShowFps, GameOptions.ShowFps(Prefs));
 			intent.PutExtra(GameActivity.ExtraHideTouch, GameOptions.HideTouch(Prefs));
 			intent.PutExtra(GameActivity.ExtraTouchOpacity, GameOptions.Opacity(Prefs));
@@ -411,7 +390,6 @@ namespace CelesteAndroid
 				RunJob(installer => L.SavesImported(installer.ImportSaves(uri)));
 		}
 
-		/// <summary>Importação do jogo: cópia → patch → fundo.</summary>
 		private void RunInstall(Action<GameInstaller> import)
 		{
 			RunJob(installer =>
@@ -424,7 +402,6 @@ namespace CelesteAndroid
 			});
 		}
 
-		/// <summary>Roda uma tarefa do instalador fora da thread de UI, com progresso; devolve a mensagem de sucesso.</summary>
 		private void RunJob(Func<GameInstaller, string> job)
 		{
 			busy = true;

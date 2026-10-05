@@ -17,11 +17,6 @@ using Color = Android.Graphics.Color;
 
 namespace CelesteAndroid
 {
-	/// <summary>
-	/// Editor dos controles de toque: arraste cada botão (ou o analógico) para mudar de lugar e use a barra
-	/// para mudar o tamanho. O resultado vai para touch_layout.txt, que o jogo (TouchControls) lê ao iniciar.
-	/// Posições são guardadas como fração da tela, então valem em qualquer resolução.
-	/// </summary>
 	[Activity(
 		Name = "org.celesteandroid.celeste.ControlsEditorActivity",
 		Label = "Celeste",
@@ -39,7 +34,6 @@ namespace CelesteAndroid
 		private TextView label = null!;
 		private SeekBar seek = null!;
 
-		// Só paisagem: qualquer pedido de outra orientação vira paisagem.
 		public override ScreenOrientation RequestedOrientation
 		{
 			get => base.RequestedOrientation;
@@ -48,7 +42,6 @@ namespace CelesteAndroid
 		private TextView opacityLabel = null!;
 		private SeekBar opacitySeek = null!;
 
-		// Grade de alinhamento (só no editor, vale também para o contador de FPS) e posição do FPS.
 		private const string PrefGrid = "editor_grid";
 		private int gridMode;
 		private Button gridButton = null!;
@@ -88,14 +81,13 @@ namespace CelesteAndroid
 
 			canvas = new ControlsCanvas(this, GameInstaller.TouchLayoutFile(this));
 			canvas.OpacityPercent = GameOptions.Opacity(GameOptions.Prefs(this));
-			canvas.FpsEnabled = GameOptions.ShowFps(GameOptions.Prefs(this)); // sem "Mostrar FPS" ligado não há contador para posicionar
+			canvas.FpsEnabled = GameOptions.ShowFps(GameOptions.Prefs(this));
 			gridMode = Math.Clamp(GameOptions.Prefs(this).GetInt(PrefGrid, 0), 0, 3);
 			canvas.GridMode = gridMode;
 			canvas.SelectionChanged = UpdateBar;
 			canvas.FpsChanged = UpdateFpsRow;
 			root.AddView(canvas, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
-			// Barra no topo, no meio: os controles ficam nos cantos e na parte de baixo.
 			var bar = new LinearLayout(this) { Orientation = Orientation.Vertical };
 			bar.SetPadding(Dp(14), Dp(8), Dp(14), Dp(10));
 			var barShape = new GradientDrawable();
@@ -113,7 +105,7 @@ namespace CelesteAndroid
 			label = Text("", 13, Color.White, true);
 			row.AddView(label, new LinearLayout.LayoutParams(Dp(112), ViewGroup.LayoutParams.WrapContent));
 
-			seek = new SeekBar(this) { Max = 150 }; // 50% .. 200%
+			seek = new SeekBar(this) { Max = 150 };
 			seek.ProgressTintList = Android.Content.Res.ColorStateList.ValueOf(Accent);
 			seek.ThumbTintList = Android.Content.Res.ColorStateList.ValueOf(Accent);
 			seek.ProgressChanged += (_, e) =>
@@ -147,7 +139,6 @@ namespace CelesteAndroid
 			row.AddView(save, new LinearLayout.LayoutParams(Dp(70), Dp(36)) { LeftMargin = Dp(6) });
 			bar.AddView(row, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(4) });
 
-			// Opacidade dos botões: 0% (invisíveis) .. 100% (sólidos), vale para todos os controles.
 			var opacityRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
 			opacityRow.SetGravity(GravityFlags.CenterVertical);
 			opacityLabel = Text("", 13, Color.White, true);
@@ -163,8 +154,6 @@ namespace CelesteAndroid
 				UpdateLabel();
 			};
 			opacityRow.AddView(opacitySeek, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
-			// Mesmo espaço dos botões da linha de cima (8 + 74 + 6 + 78 + 6 + 70), para as duas barras ficarem alinhadas:
-			// ali fica o botão da grade, que alterna desligada / grande / média / fina.
 			gridButton = MakeButton(L.GridLabel(gridMode), filled: false);
 			gridButton.Click += (_, _) =>
 			{
@@ -176,7 +165,6 @@ namespace CelesteAndroid
 			opacityRow.AddView(gridButton, new LinearLayout.LayoutParams(Dp(74 + 6 + 78 + 6 + 70), Dp(36)) { LeftMargin = Dp(8) });
 			bar.AddView(opacityRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
 
-			// Posição do contador de FPS: canto + margem X e Y (distância até a borda). Também dá para arrastá-lo na tela.
 			fpsRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
 			fpsRow.SetGravity(GravityFlags.CenterVertical);
 			fpsCornerButton = MakeButton("", filled: false);
@@ -213,7 +201,6 @@ namespace CelesteAndroid
 			UpdateFpsRow();
 		}
 
-		/// <summary>Margem do FPS: 0..50% da tela em passos de 0,1%.</summary>
 		private SeekBar MakeFpsSeek(bool x)
 		{
 			var s = new SeekBar(this) { Max = 500 };
@@ -232,7 +219,6 @@ namespace CelesteAndroid
 			return s;
 		}
 
-		/// <summary>Sincroniza canto e margens do FPS com o canvas (também chamado quando o FPS é arrastado).</summary>
 		private void UpdateFpsRow()
 		{
 			if (fpsRow == null)
@@ -296,7 +282,6 @@ namespace CelesteAndroid
 		{
 			if (!OperatingSystem.IsAndroidVersionAtLeast(30))
 				return;
-			// A partir do Android 15 o app já é edge-to-edge por padrão.
 			if (!OperatingSystem.IsAndroidVersionAtLeast(35))
 				Window!.SetDecorFitsSystemWindows(false);
 			IWindowInsetsController? insets = Window!.InsetsController;
@@ -308,22 +293,18 @@ namespace CelesteAndroid
 		}
 	}
 
-	/// <summary>Desenha os controles na mesma geometria do TouchControls e deixa arrastá-los.</summary>
 	internal sealed class ControlsCanvas : View
 	{
-		// Count = botões/analógico com posição própria; Fps (= Count) é o contador de FPS, que tem canto + margens em vez de x/y.
 		public const int Stick = 0, Jump = 1, Dash = 2, Grab = 3, Pause = 4, Tab = 5, Count = 6, Fps = 6;
 
 		public static string[] Names => L.ControlNames;
 		private static readonly string[] Keys = { "stick", "jump", "dash", "grab", "pause", "tab" };
-		// Mesma arte pixel art do jogo (PixelButtonArt, compartilhado com o TouchControls).
 		private static readonly PixelButtonArt.Sprite?[] Sprites =
 		{
 			null, PixelButtonArt.Jump, PixelButtonArt.Dash, PixelButtonArt.Grab, PixelButtonArt.Pause, PixelButtonArt.Tab,
 		};
 		private readonly Bitmap?[] bitmaps = new Bitmap?[Count];
 
-		// Mesmos valores do TouchControls.
 		private const float ButtonSize = 0.17f;
 		private const float StickRadius = 0.13f;
 		private const float StickX = 0.30f;
@@ -332,18 +313,16 @@ namespace CelesteAndroid
 		private readonly string path;
 		private readonly float[] fx = new float[Count];
 		private readonly float[] fy = new float[Count];
-		private readonly float[] scale = new float[Count + 1]; // o último é a escala do texto do FPS
+		private readonly float[] scale = new float[Count + 1];
 		private readonly Paint paint = new(PaintFlags.AntiAlias);
 		private bool ready;
 		private bool isDefault = true;
 		private bool dragging;
 		private float dragDx, dragDy;
 
-		// ---- Contador de FPS: canto (bit 0 = direita, bit 1 = baixo) e margens em fração da largura/altura ----
 		private int fpsCorner;
 		private float fpsMx, fpsMy;
 
-		/// <summary>Só mostra/permite arrastar o FPS se a opção "Mostrar FPS" estiver ligada.</summary>
 		public bool FpsEnabled { get; set; }
 		public Action? FpsChanged { get; set; }
 
@@ -367,7 +346,6 @@ namespace CelesteAndroid
 
 		private int gridMode;
 
-		/// <summary>Grade de alinhamento: 0 = desligada; 1, 2, 3 = 12, 24, 48 células na altura. Os itens "grudam" nela ao serem arrastados.</summary>
 		public int GridMode
 		{
 			get => gridMode;
@@ -392,7 +370,6 @@ namespace CelesteAndroid
 
 		private int opacityPercent = GameOptions.DefaultOpacity;
 
-		/// <summary>Opacidade dos controles (0..100); a prévia usa a mesma fórmula do TouchControls.</summary>
 		public int OpacityPercent
 		{
 			get => opacityPercent;
@@ -403,8 +380,6 @@ namespace CelesteAndroid
 			}
 		}
 
-		// Com 0% a prévia sumiria e não haveria o que arrastar: mantém um mínimo só no editor
-		// (o item selecionado também tem um aro de destaque).
 		private float PreviewAlpha => Math.Max(opacityPercent / 100f, 0.12f);
 
 		public ControlsCanvas(Context context, string path) : base(context)
@@ -421,12 +396,10 @@ namespace CelesteAndroid
 
 		private float Dp(float dp) => TypedValue.ApplyDimension(ComplexUnitType.Dip, dp, Resources!.DisplayMetrics);
 
-		// ---- Geometria ----
 		private float Unit => Height * ButtonSize;
 		private float BtnRadius(int i) => (i == Pause ? 0.32f : i == Tab ? 0.4f : 0.5f) * Unit * scale[i];
 		private float StickRange => Height * StickRadius * scale[Stick];
 		private float VisibleRadius(int i) => i == Stick ? StickRange * 1.1f : BtnRadius(i);
-		// Mesma geometria do TouchControls.DrawFps: célula = 0,45% da altura * escala; "60 FPS" = 6 caracteres de 6 células (sem o espaço final) x 7 de altura.
 		private float FpsCell => Math.Max(2f, Height * 0.0045f) * scale[Fps];
 		private float FpsW => (6 * 6f - 1f) * FpsCell;
 		private float FpsH => 7f * FpsCell;
@@ -439,7 +412,6 @@ namespace CelesteAndroid
 			return new RectF(x, y, x + w, y + h);
 		}
 
-		/// <summary>Mantém o texto do FPS inteiro dentro da tela.</summary>
 		private void ClampFps()
 		{
 			if (Width <= 0 || Height <= 0)
@@ -449,7 +421,6 @@ namespace CelesteAndroid
 			FpsChanged?.Invoke();
 		}
 
-		/// <summary>Arrastando: o canto é o mais próximo do centro do texto; as margens são a distância até as bordas desse canto.</summary>
 		private void MoveFps(float cx, float cy)
 		{
 			float w = FpsW, h = FpsH;
@@ -472,10 +443,9 @@ namespace CelesteAndroid
 			ready = true;
 			SetDefaults();
 			LoadFile();
-			SelectionChanged?.Invoke(); // atualiza a barra com o tamanho salvo
+			SelectionChanged?.Invoke();
 		}
 
-		/// <summary>Layout padrão. Manter em sincronia com TouchControls.Center/StickBase.</summary>
 		private void SetDefaults()
 		{
 			float w = Width, h = Height, u = h * ButtonSize;
@@ -487,7 +457,6 @@ namespace CelesteAndroid
 			Place(Tab, w - 1.75f * u, 0.8f * u);
 			for (int i = 0; i <= Count; i++)
 				scale[i] = 1f;
-			// FPS: canto superior esquerdo, margem de 3 células (igual ao padrão do TouchControls).
 			fpsCorner = 0;
 			fpsMx = Math.Max(2f, h * 0.0045f) * 3f / w;
 			fpsMy = Math.Max(2f, h * 0.0045f) * 3f / h;
@@ -519,7 +488,6 @@ namespace CelesteAndroid
 						continue;
 					if (kv[0].Trim() == "fps")
 					{
-						// fps=canto,mx,my,escala
 						string[] fv = kv[1].Split(',');
 						if (fv.Length == 4
 							&& int.TryParse(fv[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int corner)
@@ -551,11 +519,9 @@ namespace CelesteAndroid
 			}
 			catch (Exception)
 			{
-				// Arquivo ilegível: fica o layout padrão.
 			}
 		}
 
-		/// <summary>Salva o layout; se estiver no padrão, apaga o arquivo (o jogo volta ao padrão dele).</summary>
 		public void Save()
 		{
 			try
@@ -599,7 +565,6 @@ namespace CelesteAndroid
 			fy[Selected] = py / Height;
 		}
 
-		// ---- Desenho ----
 		protected override void OnDraw(Canvas? canvas)
 		{
 			base.OnDraw(canvas);
@@ -619,7 +584,6 @@ namespace CelesteAndroid
 				return;
 			paint.SetStyle(Paint.Style.Stroke!);
 			paint.StrokeWidth = Math.Max(1f, Dp(0.75f));
-			// Uma linha mais forte a cada 4 células, para contar com o olho.
 			for (int k = 0; k * g <= Width; k++)
 			{
 				paint.Color = Color.Argb(k % 4 == 0 ? 80 : 34, 255, 255, 255);
@@ -632,7 +596,6 @@ namespace CelesteAndroid
 			}
 		}
 
-		// Fonte 5x7 igual à do TouchControls (só os caracteres de "60 FPS").
 		private static readonly Dictionary<char, string[]> FpsGlyphs = new()
 		{
 			['6'] = new[] { "00110", "01000", "10000", "11110", "10001", "10001", "01110" },
@@ -662,10 +625,9 @@ namespace CelesteAndroid
 		{
 			RectF r = FpsRect();
 			float c = FpsCell;
-			DrawFpsGlyphs(canvas, r.Left + c * 0.5f, r.Top + c * 0.5f, c, Color.Argb(190, 0, 0, 0)); // sombra, como no jogo
+			DrawFpsGlyphs(canvas, r.Left + c * 0.5f, r.Top + c * 0.5f, c, Color.Argb(190, 0, 0, 0));
 			DrawFpsGlyphs(canvas, r.Left, r.Top, c, Color.White);
 
-			// Moldura: forte quando selecionado, discreta senão (mostra onde tocar para arrastar).
 			float pad = Dp(6);
 			paint.SetStyle(Paint.Style.Stroke!);
 			paint.StrokeWidth = Dp(Selected == Fps ? 3 : 1.5f);
@@ -673,7 +635,6 @@ namespace CelesteAndroid
 			canvas.DrawRoundRect(new RectF(r.Left - pad, r.Top - pad, r.Right + pad, r.Bottom + pad), Dp(6), Dp(6), paint);
 		}
 
-		/// <summary>Opacidade dos botões pixel art: mesma curva do TouchControls.ButtonOpacity (45% vira 90%, 100% fica sólido).</summary>
 		private float ButtonAlpha
 		{
 			get
@@ -683,7 +644,6 @@ namespace CelesteAndroid
 			}
 		}
 
-		/// <summary>Alfa 0..255 = opacidade * fator (mesmos fatores do TouchControls.Draw).</summary>
 		private int A(float factor) => Math.Clamp((int)Math.Round(PreviewAlpha * factor * 255f), 0, 255);
 
 		private void DrawItem(Canvas canvas, int i)
@@ -704,14 +664,12 @@ namespace CelesteAndroid
 			{
 				PixelButtonArt.Sprite sp = Sprites[i]!;
 				int n = PixelButtonArt.Size;
-				// Tamanho múltiplo de 28: cada "pixel" da arte ocupa um número inteiro de pixels da tela.
 				int cell = Math.Max(1, (int)Math.Round(BtnRadius(i) * 2f / n));
 				float half = cell * n / 2f;
 				int body = sp.GlowRgb;
 				int cr = (body >> 16) & 255, cg = (body >> 8) & 255, cb = body & 255;
-				float alpha = ButtonAlpha; // segue o controle de opacidade do editor
+				float alpha = ButtonAlpha;
 
-				// Brilho suave ao redor, como no jogo.
 				int glowA = Math.Clamp((int)Math.Round(alpha * 0.55f * 255f), 0, 255);
 				int glowColor = Color.Argb(glowA, cr, cg, cb).ToArgb();
 				int glowClear = Color.Argb(0, cr, cg, cb).ToArgb();
@@ -724,7 +682,6 @@ namespace CelesteAndroid
 					paint.SetShader(null);
 				}
 
-				// Sprite sem suavização, para os pixels ficarem nítidos.
 				paint.SetStyle(Paint.Style.Fill!);
 				paint.FilterBitmap = false;
 				paint.Alpha = Math.Clamp((int)Math.Round(alpha * 255f), 0, 255);
@@ -761,7 +718,6 @@ namespace CelesteAndroid
 			return bmp;
 		}
 
-		// ---- Toque ----
 		private int HitTest(float x, float y)
 		{
 			int best = -1;
@@ -777,7 +733,6 @@ namespace CelesteAndroid
 					best = i;
 				}
 			}
-			// O FPS fica por último: onde ele encosta num botão, o botão tem prioridade.
 			if (best < 0 && FpsEnabled)
 			{
 				RectF r = FpsRect();
@@ -824,7 +779,6 @@ namespace CelesteAndroid
 							MoveFps(px, py);
 						else
 						{
-							// Com a grade ligada o centro do botão "gruda" no cruzamento mais próximo.
 							fx[Selected] = Snap(px) / Width;
 							fy[Selected] = Snap(py) / Height;
 							isDefault = false;

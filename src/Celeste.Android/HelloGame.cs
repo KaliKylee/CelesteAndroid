@@ -7,9 +7,6 @@ using Microsoft.Xna.Framework.Input.Touch;
 
 namespace CelesteAndroid
 {
-	/// <summary>
-	/// Jogo FNA mínimo para validar a stack no aparelho (M3): gráficos, toque, controle e ciclo de vida.
-	/// </summary>
 	public class HelloGame : Game
 	{
 		private readonly GraphicsDeviceManager graphics;
@@ -32,7 +29,6 @@ namespace CelesteAndroid
 
 		protected override void Initialize()
 		{
-			// Sem isso o FNA usa 800x480 e estica para a tela.
 			DisplayMode mode = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode;
 			graphics.PreferredBackBufferWidth = mode.Width;
 			graphics.PreferredBackBufferHeight = mode.Height;
@@ -71,17 +67,14 @@ namespace CelesteAndroid
 
 		protected override void Draw(GameTime gameTime)
 		{
-			// Depois do ApplyChanges o viewport interno do FNA3D fica no tamanho antigo (800x480).
 			PresentationParameters bb = GraphicsDevice.PresentationParameters;
 			GraphicsDevice.Viewport = new Viewport(0, 0, bb.BackBufferWidth, bb.BackBufferHeight);
 			GraphicsDevice.Clear(background);
 
 			batch!.Begin();
-			// Quadrado girando: prova que o loop está vivo.
 			Viewport vp = GraphicsDevice.Viewport;
 			float t = (float)gameTime.TotalGameTime.TotalSeconds;
 			batch.Draw(pixel, new Vector2(vp.Width / 2f, vp.Height / 2f), null, Color.White, t, new Vector2(0.5f), 200f, SpriteEffects.None, 0f);
-			// Um quadrado em cada dedo.
 			foreach (TouchLocation touch in TouchPanel.GetState())
 				batch.Draw(pixel, new Rectangle((int)touch.Position.X - 60, (int)touch.Position.Y - 60, 120, 120), Color.Yellow);
 			batch.End();

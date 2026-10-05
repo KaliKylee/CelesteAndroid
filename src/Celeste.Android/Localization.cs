@@ -6,10 +6,6 @@ namespace CelesteAndroid
 {
 	public enum Lang { Pt, En, Es }
 
-	/// <summary>
-	/// Textos da tela inicial em Português, Inglês e Espanhol.
-	/// O idioma padrão segue o do sistema; a escolha manual fica salva nas preferências.
-	/// </summary>
 	public static class L
 	{
 		private const string PrefLang = "lang";
@@ -22,7 +18,6 @@ namespace CelesteAndroid
 
 		public static string Name(Lang l) => l switch { Lang.Pt => "Português", Lang.Es => "Español", _ => "English" };
 
-		/// <summary>Carrega o idioma salvo; sem escolha manual, usa o do sistema (padrão: inglês).</summary>
 		public static void Init(ISharedPreferences prefs)
 		{
 			string? saved = prefs.GetString(PrefLang, null);
@@ -58,7 +53,6 @@ namespace CelesteAndroid
 			_ => en,
 		};
 
-		// ---- Tela inicial ----
 		public static string Subtitle => T("Port nativo para Android", "Native port for Android", "Port nativo para Android");
 		public static string Play => T("JOGAR", "PLAY", "JUGAR");
 		public static string SelectFiles => T("Selecionar arquivos do jogo", "Select game files", "Seleccionar archivos del juego");
@@ -85,12 +79,10 @@ namespace CelesteAndroid
 
 		public static string PortBy => T("Port por", "Port by", "Port por");
 
-		// ---- Editor de controles ----
 		public static string EditorHint => T(
 			"Arraste os controles para mudar de lugar. Use as barras para mudar o tamanho e a opacidade, e a grade para alinhar.",
 			"Drag the controls to move them. Use the sliders to change size and opacity, and the grid to align.",
 			"Arrastra los controles para moverlos. Usa las barras para cambiar el tamaño y la opacidad, y la cuadrícula para alinear.");
-		/// <summary>Texto do botão de grade do editor: 0 = desligada, 1..3 = tamanho da célula.</summary>
 		public static string GridLabel(int mode) => mode switch
 		{
 			1 => T("Grade: grande", "Grid: large", "Cuadrícula: grande"),
@@ -98,7 +90,6 @@ namespace CelesteAndroid
 			3 => T("Grade: fina", "Grid: fine", "Cuadrícula: fina"),
 			_ => T("Grade: desligada", "Grid: off", "Cuadrícula: apagada"),
 		};
-		/// <summary>Cantos do contador de FPS, na ordem do índice (bit 0 = direita, bit 1 = baixo).</summary>
 		public static string[] FpsCorners => Current switch
 		{
 			Lang.Pt => new[] { "FPS ↖ Sup. esq.", "FPS ↗ Sup. dir.", "FPS ↙ Inf. esq.", "FPS ↘ Inf. dir." },
@@ -117,7 +108,6 @@ namespace CelesteAndroid
 			_ => new[] { "Stick", "Jump", "Dash", "Grab", "Pause", "Tab" },
 		};
 
-		// ---- Instalador ----
 		public static string Searching => T("Procurando por Celeste na pasta…", "Looking for Celeste in the folder…", "Buscando Celeste en la carpeta…");
 		public static string NotFound => T("Não encontrei o Celeste.exe e a pasta Content aí.", "Couldn't find Celeste.exe and the Content folder there.", "No encontré Celeste.exe y la carpeta Content ahí.");
 		public static string ReadingZip => T("Lendo o .zip…", "Reading the .zip…", "Leyendo el .zip…");

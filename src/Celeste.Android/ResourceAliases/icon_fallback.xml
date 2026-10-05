@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Sem GameArt/icon: ícone original (montanha). -->
 <resources>
 	<item type="mipmap" name="app_icon">@mipmap/ic_fallback</item>
 </resources>

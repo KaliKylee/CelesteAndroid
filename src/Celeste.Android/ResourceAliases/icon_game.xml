@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ícone gerado por scripts/generate-game-art.ps1 (GameArt/icon, fora do git). -->
 <resources>
 	<item type="mipmap" name="app_icon">@mipmap/ic_celeste</item>
 </resources>

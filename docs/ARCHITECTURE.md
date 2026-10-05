@@ -109,3 +109,7 @@ Layout editor: `ControlsEditorActivity`, where each control can be dragged and r
 - Touch controls: first version done (see "Touch controls"); still to do: layout editor, configurable keys
 - Everest (mod loader) support
 - More devices tested (Mali, Xclipse, Tensor)
+
+## Orientation
+
+The app is landscape-only. All three activities (`LauncherActivity`, `ControlsEditorActivity`, `GameActivity`) are declared `SensorLandscape` (so it is applied by the system before the first frame) and set it again at the top of `OnCreate`. Each also overrides `RequestedOrientation` and passes every request through `LandscapeLock.Coerce`, so when SDL asks for an orientation while creating the window (before the `SDL_ORIENTATIONS=LandscapeLeft LandscapeRight` hint set in `GameActivity.Main` takes effect) anything that is not landscape becomes `SensorLandscape`. No portrait value is used anywhere.

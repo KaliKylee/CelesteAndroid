@@ -1,18 +1,12 @@
 name: Build APK
 
-# Builds the PUBLIC apk (no game files, no official art). Needs two private downloads, because
-# Celeste.exe and FMOD are proprietary and can't live in the repo:
-#   secrets.CELESTE_ZIP_URL  direct link to a .zip (or the bare .exe) containing Celeste.exe, FNA build
-#   secrets.FMOD_ZIP_URL     direct link to a .zip with libfmod.so, libfmodstudio.so (arm64-v8a) and fmod.jar, FMOD 1.10.14
-# Optional signing (otherwise the debug key is used and updates over a previous install will fail):
-#   secrets.KEYSTORE_BASE64, KEYSTORE_ALIAS, KEYSTORE_PASSWORD
 on:
   workflow_dispatch:
   push:
     tags: ['v*']
 
 permissions:
-  contents: write # only used to attach the APK to a release on tag pushes
+  contents: write
 
 jobs:
   apk:
@@ -83,7 +77,7 @@ jobs:
           $file = Join-Path $tmp 'download.bin'
           Invoke-WebRequest -Uri $env:CELESTE_ZIP_URL -OutFile $file
           $head = [IO.File]::ReadAllBytes($file)[0..1]
-          if ($head[0] -eq 0x4D -and $head[1] -eq 0x5A) {      # "MZ": a bare Celeste.exe
+          if ($head[0] -eq 0x4D -and $head[1] -eq 0x5A) {
             Copy-Item $file Celeste\Celeste.exe
           } else {
             Expand-Archive $file (Join-Path $tmp 'x') -Force
@@ -117,7 +111,6 @@ jobs:
 
       - name: Build native libs
         run: |
-          # The submodule commits decide the cache validity: rebuild when they differ from the cached build.
           $rev = ((git -C external/SDL rev-parse HEAD) + ' ' + (git -C external/FNA rev-parse HEAD)).Trim()
           $stamp = 'natives\.submodules'
           if ((Test-Path natives\android-arm64\libSDL3.so) -and (Test-Path $stamp) -and ((Get-Content $stamp -Raw).Trim() -eq $rev)) {

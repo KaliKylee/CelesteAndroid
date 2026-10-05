@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ícone do app: Madeline. Fundo = a mesma arte desfocada; primeiro plano = arte nítida (ocupa a área visível da máscara). -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
 	<background android:drawable="@drawable/ic_madeline_bg" />
 	<foreground android:drawable="@drawable/ic_madeline_fg" />

@@ -67,6 +67,10 @@
 		<AndroidAsset Include="$(CelesteGameDir)Content\**\*" LogicalName="game/Content/%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
 	<ItemGroup>
+		<!-- Arte pixel art dos botões de toque, compartilhada com o módulo de patches (sem dependências). -->
+		<Compile Include="..\Celeste.Android.Patches\PixelButtonArt.cs" Link="PixelButtonArt.cs" />
+	</ItemGroup>
+	<ItemGroup>
 		<ProjectReference Include="..\..\external\FNA\FNA.Core.csproj" />
 		<ProjectReference Include="..\Steamworks.NET\Steamworks.NET.csproj" />
 		<ProjectReference Include="..\Celeste.Patcher\Celeste.Patcher.csproj" />

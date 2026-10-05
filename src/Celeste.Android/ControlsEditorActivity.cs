@@ -229,19 +229,16 @@ namespace CelesteAndroid
 	/// <summary>Desenha os controles na mesma geometria do TouchControls e deixa arrastá-los.</summary>
 	internal sealed class ControlsCanvas : View
 	{
-		public const int Stick = 0, Jump = 1, Dash = 2, Grab = 3, Pause = 4, Count = 5;
+		public const int Stick = 0, Jump = 1, Dash = 2, Grab = 3, Pause = 4, Tab = 5, Count = 6;
 
 		public static string[] Names => L.ControlNames;
-		private static readonly string[] Keys = { "stick", "jump", "dash", "grab", "pause" };
-		private static readonly int[][] Rgb =
+		private static readonly string[] Keys = { "stick", "jump", "dash", "grab", "pause", "tab" };
+		// Mesma arte pixel art do jogo (PixelButtonArt, compartilhado com o TouchControls).
+		private static readonly PixelButtonArt.Sprite?[] Sprites =
 		{
-			new[] { 255, 255, 255 },
-			new[] { 120, 220, 140 },
-			new[] { 240, 120, 150 },
-			new[] { 120, 170, 240 },
-			new[] { 220, 220, 220 },
+			null, PixelButtonArt.Jump, PixelButtonArt.Dash, PixelButtonArt.Grab, PixelButtonArt.Pause, PixelButtonArt.Tab,
 		};
-		private static readonly string[] Glyphs = { "", "A", "X", "G", "" };
+		private readonly Bitmap?[] bitmaps = new Bitmap?[Count];
 
 		// Mesmos valores do TouchControls.
 		private const float ButtonSize = 0.17f;
@@ -296,7 +293,7 @@ namespace CelesteAndroid
 
 		// ---- Geometria ----
 		private float Unit => Height * ButtonSize;
-		private float BtnRadius(int i) => (i == Pause ? 0.32f : 0.5f) * Unit * scale[i];
+		private float BtnRadius(int i) => (i == Pause ? 0.32f : i == Tab ? 0.4f : 0.5f) * Unit * scale[i];
 		private float StickRange => Height * StickRadius * scale[Stick];
 		private float VisibleRadius(int i) => i == Stick ? StickRange * 1.1f : BtnRadius(i);
 		private float HitRadius(int i) => i == Stick ? StickRange * 1.1f : BtnRadius(i) * 1.25f;
@@ -321,6 +318,7 @@ namespace CelesteAndroid
 			Place(Dash, w - 2.45f * u, h - 0.95f * u);
 			Place(Grab, w - 2.15f * u, h - 2.35f * u);
 			Place(Pause, w - 0.8f * u, 0.8f * u);
+			Place(Tab, w - 1.75f * u, 0.8f * u);
 			for (int i = 0; i < Count; i++)
 				scale[i] = 1f;
 			isDefault = true;
@@ -417,13 +415,22 @@ namespace CelesteAndroid
 				DrawItem(canvas, i);
 		}
 
+		/// <summary>Opacidade dos botões pixel art: mesma curva do TouchControls.ButtonOpacity (45% vira 90%, 100% fica sólido).</summary>
+		private float ButtonAlpha
+		{
+			get
+			{
+				float o = PreviewAlpha;
+				return o <= 0.45f ? o / 0.45f * 0.9f : Math.Min(1f, 0.9f + (o - 0.45f) / 0.55f * 0.1f);
+			}
+		}
+
 		/// <summary>Alfa 0..255 = opacidade * fator (mesmos fatores do TouchControls.Draw).</summary>
 		private int A(float factor) => Math.Clamp((int)Math.Round(PreviewAlpha * factor * 255f), 0, 255);
 
 		private void DrawItem(Canvas canvas, int i)
 		{
 			float cx = fx[i] * Width, cy = fy[i] * Height;
-			int[] c = Rgb[i];
 			if (i == Stick)
 			{
 				float range = StickRange;
@@ -437,30 +444,34 @@ namespace CelesteAndroid
 			}
 			else
 			{
-				float r = BtnRadius(i);
-				paint.SetStyle(Paint.Style.Fill!);
-				paint.Color = Color.Argb(A(0.55f), c[0], c[1], c[2]);
-				canvas.DrawCircle(cx, cy, r, paint);
-				paint.SetStyle(Paint.Style.Stroke!);
-				paint.StrokeWidth = r * 0.12f;
-				paint.Color = Color.Argb(A(1f), c[0], c[1], c[2]);
-				canvas.DrawCircle(cx, cy, r, paint);
+				PixelButtonArt.Sprite sp = Sprites[i]!;
+				int n = PixelButtonArt.Size;
+				// Tamanho múltiplo de 28: cada "pixel" da arte ocupa um número inteiro de pixels da tela.
+				int cell = Math.Max(1, (int)Math.Round(BtnRadius(i) * 2f / n));
+				float half = cell * n / 2f;
+				int body = sp.GlowRgb;
+				int cr = (body >> 16) & 255, cg = (body >> 8) & 255, cb = body & 255;
+				float alpha = ButtonAlpha; // segue o controle de opacidade do editor
 
+				// Brilho suave ao redor, como no jogo.
+				int glowA = Math.Clamp((int)Math.Round(alpha * 0.55f * 255f), 0, 255);
+				int glowColor = Color.Argb(glowA, cr, cg, cb).ToArgb();
+				int glowClear = Color.Argb(0, cr, cg, cb).ToArgb();
+				using (var shader = new RadialGradient(cx, cy, half * 1.35f, new[] { glowColor, glowColor, glowClear }, new[] { 0f, 0.7f, 1f }, Shader.TileMode.Clamp!))
+				{
+					paint.SetStyle(Paint.Style.Fill!);
+					paint.Alpha = 255;
+					paint.SetShader(shader);
+					canvas.DrawCircle(cx, cy, half * 1.35f, paint);
+					paint.SetShader(null);
+				}
+
+				// Sprite sem suavização, para os pixels ficarem nítidos.
 				paint.SetStyle(Paint.Style.Fill!);
-				paint.Color = Color.Argb(A(1.8f), 255, 255, 255);
-				if (i == Pause)
-				{
-					float bw = r * 0.2f, bh = r * 0.8f, gap = r * 0.18f;
-					canvas.DrawRect(cx - gap - bw, cy - bh / 2f, cx - gap, cy + bh / 2f, paint);
-					canvas.DrawRect(cx + gap, cy - bh / 2f, cx + gap + bw, cy + bh / 2f, paint);
-				}
-				else
-				{
-					paint.TextSize = r * 0.95f;
-					paint.TextAlign = Paint.Align.Center!;
-					paint.SetTypeface(Typeface.DefaultBold);
-					canvas.DrawText(Glyphs[i], cx, cy + paint.TextSize * 0.35f, paint);
-				}
+				paint.FilterBitmap = false;
+				paint.Alpha = Math.Clamp((int)Math.Round(alpha * 255f), 0, 255);
+				canvas.DrawBitmap(GetBitmap(i), null, new RectF(cx - half, cy - half, cx + half, cy + half), paint);
+				paint.Alpha = 255;
 			}
 
 			if (i == Selected)
@@ -470,6 +481,26 @@ namespace CelesteAndroid
 				paint.Color = Color.ParseColor("#F2B8D8");
 				canvas.DrawCircle(cx, cy, VisibleRadius(i) + Dp(6), paint);
 			}
+		}
+
+		private Bitmap GetBitmap(int i)
+		{
+			if (bitmaps[i] != null)
+				return bitmaps[i]!;
+			PixelButtonArt.Sprite sp = Sprites[i]!;
+			int n = PixelButtonArt.Size;
+			int[] px = new int[n * n];
+			for (int y = 0; y < n; y++)
+			{
+				for (int x = 0; x < n; x++)
+				{
+					int rgb = sp.ColorOf(sp.Rows[y][x]);
+					px[y * n + x] = rgb < 0 ? 0 : Color.Argb(255, (rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255).ToArgb();
+				}
+			}
+			Bitmap bmp = Bitmap.CreateBitmap(px, n, n, Bitmap.Config.Argb8888!)!;
+			bitmaps[i] = bmp;
+			return bmp;
 		}
 
 		// ---- Toque ----

@@ -93,9 +93,9 @@ namespace CelesteAndroid
 		public static string ControlsSaved => T("Controles salvos", "Controls saved", "Controles guardados");
 		public static string[] ControlNames => Current switch
 		{
-			Lang.Pt => new[] { "Analógico", "Pular", "Dash", "Agarrar", "Pausar" },
-			Lang.Es => new[] { "Analógico", "Saltar", "Dash", "Agarrar", "Pausa" },
-			_ => new[] { "Stick", "Jump", "Dash", "Grab", "Pause" },
+			Lang.Pt => new[] { "Analógico", "Pular", "Dash", "Agarrar", "Pausar", "Tab" },
+			Lang.Es => new[] { "Analógico", "Saltar", "Dash", "Agarrar", "Pausa", "Tab" },
+			_ => new[] { "Stick", "Jump", "Dash", "Grab", "Pause", "Tab" },
 		};
 
 		// ---- Instalador ----

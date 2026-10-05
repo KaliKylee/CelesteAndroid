@@ -100,7 +100,9 @@ MonoMod (and Mono.Cecil) run inside the launcher. The things that were needed:
 
 Mapping: fixed stick at the bottom-left (the base never moves; touches in a wider outer zone around it also grab the stick); right side Jump → A, Dash → X+B, Grab → right trigger, top-right Pause → Start. Tunables are the static fields at the top of the class.
 
-Layout editor: the launcher's "Personalizar controles" button opens `ControlsEditorActivity`, where each control can be dragged and resized. The result is saved as fractions of the screen in `files/touch_layout.txt` (lines `name=x,y,scale`); `TouchControls` reads it on startup via `HostConfig.TouchLayoutPath`, and no file means the default layout. Default positions are duplicated in `ControlsCanvas.SetDefaults` and `TouchControls.Center`/`StickBase` and must be kept in sync.
+Launcher options: the "Options" button on the launcher opens a menu with **Edit controls** (opens `ControlsEditorActivity`), **Show FPS** and **Hide touch buttons**. The values live in the `launcher` SharedPreferences (`GameOptions`); because the game runs in the `:game` process, `LauncherActivity.Play` forwards them as Intent extras, `GameActivity.Main` copies them into `AppContext` and `TouchControls` reads them through `HostConfig.ShowFps` / `HideTouch` / `TouchOpacityPercent`. Hiding the buttons also disables touch input (the real gamepad state is returned), and the FPS counter is drawn by `TouchControls.Draw` even when the buttons are hidden.
+
+Layout editor: `ControlsEditorActivity`, where each control can be dragged and resized, and where a 0–100% opacity slider (default 45%, same as `TouchControls.Opacity`) sets the transparency of all controls; it is saved with the layout (the editor preview never goes below 12% so the controls stay draggable). The result is saved as fractions of the screen in `files/touch_layout.txt` (lines `name=x,y,scale`); `TouchControls` reads it on startup via `HostConfig.TouchLayoutPath`, and no file means the default layout. Default positions are duplicated in `ControlsCanvas.SetDefaults` and `TouchControls.Center`/`StickBase` and must be kept in sync.
 
 ## Roadmap
 

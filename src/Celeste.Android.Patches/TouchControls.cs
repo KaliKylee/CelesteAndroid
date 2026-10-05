@@ -36,6 +36,12 @@ namespace CelesteAndroid
 		// Opções vindas da tela inicial (menu "Opções" e editor de controles), via HostConfig.
 		private static bool showFps;
 
+		// Posição do contador de FPS (salva pelo editor em touch_layout.txt, linha "fps=canto,mx,my,escala").
+		// Canto: 0 = sup. esquerdo, 1 = sup. direito, 2 = inf. esquerdo, 3 = inf. direito (bit 0 = direita, bit 1 = baixo).
+		// mx/my = distância até a borda, em fração da largura/altura da tela; negativo = margem padrão.
+		private static int fpsCorner;
+		private static float fpsMx = -1f, fpsMy = -1f, fpsScale = 1f;
+
 		static TouchControls()
 		{
 			Opacity = (HostConfig.TouchOpacityPercent ?? 45) / 100f;
@@ -135,6 +141,22 @@ namespace CelesteAndroid
 					string[] kv = line.Split('=');
 					if (kv.Length != 2)
 						continue;
+					if (kv[0].Trim() == "fps")
+					{
+						string[] fv = kv[1].Split(',');
+						if (fv.Length == 4
+							&& int.TryParse(fv[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int corner)
+							&& float.TryParse(fv[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float fmx)
+							&& float.TryParse(fv[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float fmy)
+							&& float.TryParse(fv[3], NumberStyles.Float, CultureInfo.InvariantCulture, out float fsc))
+						{
+							fpsCorner = Math.Clamp(corner, 0, 3);
+							fpsMx = Math.Clamp(fmx, 0f, 0.5f);
+							fpsMy = Math.Clamp(fmy, 0f, 0.5f);
+							fpsScale = Math.Clamp(fsc, 0.5f, 2f);
+						}
+						continue;
+					}
 					int idx = kv[0].Trim() switch { "jump" => 0, "dash" => 1, "grab" => 2, "pause" => 3, "tab" => 4, "stick" => 5, _ => -1 };
 					string[] v = kv[1].Split(',');
 					if (idx < 0 || v.Length != 3)
@@ -373,8 +395,16 @@ namespace CelesteAndroid
 				fpsWindowStartMs = now;
 			}
 
-			float cell = Math.Max(2f, screenH * 0.0045f);
-			DrawText($"{fpsValue} FPS", new Vector2(cell * 3f, cell * 3f), cell, Color.White);
+			float baseCell = Math.Max(2f, screenH * 0.0045f);
+			float cell = baseCell * fpsScale;
+			string text = $"{fpsValue} FPS";
+			float w = (text.Length * 6f - 1f) * cell, h = 7f * cell; // mesma conta do ControlsCanvas.FpsRect (editor)
+			// Sem posição salva: margem padrão de 3 células. Nos cantos da direita/de baixo o texto cresce para dentro da tela.
+			float mx = fpsMx >= 0f ? fpsMx * screenW : baseCell * 3f;
+			float my = fpsMy >= 0f ? fpsMy * screenH : baseCell * 3f;
+			float x = (fpsCorner & 1) == 1 ? screenW - mx - w : mx;
+			float y = (fpsCorner & 2) == 2 ? screenH - my - h : my;
+			DrawText(text, new Vector2(x, y), cell, Color.White);
 		}
 
 		// Fonte 5x7 só para o contador (o glifo 'P' do botão de pausa são duas barras, por isso é separada).

@@ -1,10 +1,3 @@
-# Generates the app icon and the launcher art from the user's own files.
-# Output (src/Celeste.Android/GameArt) is git-ignored: it's official game art and isn't part of the repository.
-#
-#   GameArt/icon/res   app icon (used by every build): art\icon.png|jpg, or a crop of the game's key art
-#   GameArt/art/res    launcher background + logo (personal builds only): SplashScreen.png, art\logo.png
-#
-# Usage: scripts\generate-game-art.ps1 [-GameDir <game folder>] [-Icon <image>] [-Logo <png>]
 param([string]$GameDir, [string]$Icon, [string]$Logo)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
@@ -20,7 +13,6 @@ Remove-Item -Recurse -Force $out -ErrorAction SilentlyContinue
 $iconRes = Join-Path $out 'icon\res'
 $artRes = Join-Path $out 'art\res'
 
-# Draws $src (region of $img) into $dest on a transparent $w x $h canvas; one or more layers.
 function Save-Canvas([int]$w, [int]$h, [string]$path, [object[]]$layers, [string]$format = 'png') {
 	New-Item -ItemType Directory -Force (Split-Path $path) | Out-Null
 	$bmp = New-Object System.Drawing.Bitmap $w, $h
@@ -46,14 +38,12 @@ function Layer($image, $src, [int]$x, [int]$y, [int]$w, [int]$h) {
 }
 function Rect([int]$x, [int]$y, [int]$w, [int]$h) { New-Object System.Drawing.Rectangle $x, $y, $w, $h }
 
-# --- Icon ---------------------------------------------------------------------------------------
 $iconImg = $null
 if ($Icon) {
 	$iconImg = [System.Drawing.Image]::FromFile((Resolve-Path $Icon))
 	$iconSrc = Rect 0 0 $iconImg.Width $iconImg.Height
 }
 elseif (Test-Path $splash) {
-	# No icon given: the winged strawberry + Madeline's hand from the key art.
 	$iconImg = [System.Drawing.Image]::FromFile($splash)
 	$iconSrc = Rect 700 0 480 480
 }
@@ -62,12 +52,9 @@ if ($iconImg) {
 		$densities = @{ 'mdpi' = 108; 'hdpi' = 162; 'xhdpi' = 216; 'xxhdpi' = 324; 'xxxhdpi' = 432 }
 		foreach ($d in $densities.Keys) {
 			$px = $densities[$d]
-			# Adaptive icon: launchers show only the central 72dp of the 108dp layers, so the whole image
-			# goes there (nothing gets cropped by the mask); the background is the same image, enlarged.
 			$inset = [int]($px / 6)
 			Save-Canvas $px $px "$iconRes\mipmap-$d\ic_celeste_bg.png" @(Layer $iconImg $iconSrc 0 0 $px $px)
 			Save-Canvas $px $px "$iconRes\mipmap-$d\ic_celeste_fg.png" @(Layer $iconImg $iconSrc $inset $inset ($px - 2 * $inset) ($px - 2 * $inset))
-			# Legacy icon (48dp) for launchers without adaptive icons.
 			$legacy = [int]($px * 48 / 108)
 			Save-Canvas $legacy $legacy "$iconRes\mipmap-$d\ic_celeste.png" @(Layer $iconImg $iconSrc 0 0 $legacy $legacy)
 		}
@@ -83,7 +70,6 @@ if ($iconImg) {
 	finally { $iconImg.Dispose() }
 }
 
-# --- Launcher art (personal builds) --------------------------------------------------------------
 if (Test-Path $splash) {
 	$img = [System.Drawing.Image]::FromFile($splash)
 	try {

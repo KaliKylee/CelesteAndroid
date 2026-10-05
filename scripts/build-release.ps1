@@ -1,11 +1,3 @@
-# Builds the release APKs into out/.
-#
-#   out/CelesteAndroid-<version>.apk           public build: no official art, safe to share
-#   out/CelesteAndroid-<version>-personal.apk  (-Personal) official icon/logo from your own game files
-#                                              (+ -EmbedGame: your game inside the APK) - NEVER share it
-#
-# Signing: reads %USERPROFILE%\.celeste-android\keystore.env (CELESTE_KEYSTORE, CELESTE_KEYSTORE_ALIAS,
-# CELESTE_KEYSTORE_PASS). Without it, the APK is signed with the debug key.
 param(
 	[switch]$Personal,
 	[switch]$EmbedGame
@@ -16,7 +8,6 @@ $root = Split-Path $PSScriptRoot -Parent
 $project = Join-Path $root 'src\Celeste.Android\Celeste.Android.csproj'
 $out = Join-Path $root 'out'
 New-Item -ItemType Directory -Force $out | Out-Null
-# User-level value wins if set; otherwise keep the process value (CI runners have no User-level variables).
 foreach ($k in 'JAVA_HOME', 'ANDROID_HOME', 'ANDROID_NDK_HOME') { $v = [Environment]::GetEnvironmentVariable($k, 'User'); if ($v) { Set-Item "env:$k" $v } }
 
 $version = ([xml](Get-Content $project)).Project.PropertyGroup.ApplicationDisplayVersion | Where-Object { $_ } | Select-Object -First 1
@@ -37,7 +28,6 @@ else {
 	Write-Warning "No release keystore at ${keyEnv}: signing with the debug key."
 }
 
-# The icon (art\icon.*) goes into every build; key art and logo only into -Personal ones.
 & (Join-Path $PSScriptRoot 'generate-game-art.ps1') | Out-Null
 
 if ($Personal) {
@@ -52,8 +42,6 @@ else {
 
 $publish = Join-Path $root 'build\publish'
 Remove-Item -Recurse -Force $publish -ErrorAction SilentlyContinue
-# Always a clean build: incremental builds reuse the intermediate assets, so a public APK built right
-# after a personal -EmbedGame one would still contain the game.
 Remove-Item -Recurse -Force (Join-Path $root 'src\Celeste.Android\obj\Release'), (Join-Path $root 'src\Celeste.Android\bin\Release') -ErrorAction SilentlyContinue
 dotnet publish $project -c Release -o $publish @flags @signing -nologo -v q | Out-Host
 if ($LASTEXITCODE -ne 0) { throw 'publish failed' }
@@ -61,7 +49,6 @@ if ($LASTEXITCODE -ne 0) { throw 'publish failed' }
 $apk = Get-ChildItem $publish -Filter *-Signed.apk | Select-Object -First 1
 
 if (-not $Personal) {
-	# Safety net: a public APK must never contain game files, the key art or the logo.
 	Add-Type -AssemblyName System.IO.Compression.FileSystem
 	$zip = [IO.Compression.ZipFile]::OpenRead($apk.FullName)
 	try {

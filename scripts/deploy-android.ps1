@@ -1,6 +1,3 @@
-# Ciclo de desenvolvimento no aparelho: patcheia o Celeste, compila/instala o APK e envia os arquivos.
-# Uso: scripts\deploy-android.ps1 [-Content] [-NoLaunch]
-#   -Content   também envia a pasta Content do jogo (1 GB; só na primeira vez ou se mudar)
 param(
 	[switch]$Content,
 	[switch]$NoLaunch
@@ -25,7 +22,6 @@ $apk = (Get-ChildItem "$root\src\Celeste.Android\bin\Debug" -Recurse -Filter *-S
 & $adb install -r $apk | Out-Host
 & $adb shell am force-stop $pkg
 
-# /data/local/tmp é legível pelo app; run-as copia para o armazenamento interno (files/).
 Write-Host '=== arquivos ===' -ForegroundColor Cyan
 $tmp = '/data/local/tmp/celeste'
 & $adb shell "rm -rf $tmp && mkdir -p $tmp/patched" | Out-Host

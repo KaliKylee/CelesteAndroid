@@ -1,5 +1,3 @@
-# Compila SDL3, FNA3D e FAudio para Android com o NDK e copia os .so para natives/android-<abi>.
-# Uso: scripts\build-natives-android.ps1 [-Abi arm64-v8a] [-Clean]
 param(
 	[string]$Abi = 'arm64-v8a',
 	[int]$ApiLevel = 26,
@@ -25,7 +23,6 @@ $common = @(
 	"-DCMAKE_TOOLCHAIN_FILE=$ndk/build/cmake/android.toolchain.cmake",
 	"-DANDROID_ABI=$Abi",
 	"-DANDROID_PLATFORM=android-$ApiLevel",
-	# Páginas de 16 KB (Android 15+); inofensivo em aparelhos com 4 KB.
 	'-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON',
 	'-DCMAKE_BUILD_TYPE=Release'
 )

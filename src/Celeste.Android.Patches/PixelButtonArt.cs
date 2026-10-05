@@ -2,11 +2,6 @@ using System;
 
 namespace CelesteAndroid
 {
-	/// <summary>
-	/// Arte pixel art dos botões de toque (círculo de 28x28 "pixels" com glifo embutido). Sem dependências do FNA nem do
-	/// Android: o jogo (TouchControls) e o editor de layout (ControlsEditorActivity) montam a textura a partir daqui.
-	/// Legenda: . transparente | O contorno | D borda escura | B corpo | L brilho | S reflexo | W glifo | K sombra do glifo.
-	/// </summary>
 	public static class PixelButtonArt
 	{
 		public const int Size = 28;
@@ -14,17 +9,15 @@ namespace CelesteAndroid
 		public sealed class Sprite
 		{
 			public readonly string[] Rows;
-			public readonly int[] Rgb; // 0xRRGGBB, na ordem: O D B L S W K
+			public readonly int[] Rgb;
 			public Sprite(string[] rows, int[] rgb) { Rows = rows; Rgb = rgb; }
 
-			/// <summary>Cor 0xRRGGBB do caractere, ou -1 se for transparente.</summary>
 			public int ColorOf(char ch)
 			{
 				int i = "ODBLSWK".IndexOf(ch);
 				return i < 0 ? -1 : Rgb[i];
 			}
 
-			/// <summary>Cor do brilho/halo ao redor do botão (a cor do corpo).</summary>
 			public int GlowRgb => Rgb[2];
 		}
 

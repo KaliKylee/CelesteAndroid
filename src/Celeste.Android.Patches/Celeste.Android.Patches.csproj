@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-	<!-- Módulo MonoMod: tipos/patches daqui são mesclados no Celeste.dll pelo Celeste.Patcher. -->
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
 		<AssemblyName>Celeste.Android.mm</AssemblyName>

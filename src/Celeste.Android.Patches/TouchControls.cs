@@ -12,33 +12,20 @@ using MonoMod;
 
 namespace CelesteAndroid
 {
-	/// <summary>
-	/// Controles na tela. O FNA só consulta o primeiro dos dispositivos de toque do SDL, então o
-	/// TouchPanel não serve: aqui os dedos são lidos direto do SDL3 (todos os dispositivos), viram um
-	/// GamePadState sintético (devolvido no lugar de GamePad.GetState) e o overlay é desenhado por cima
-	/// do jogo no final do RenderCore. Se um controle físico estiver conectado, ele tem prioridade e
-	/// o overlay some.
-	/// </summary>
 	public static class TouchControls
 	{
-		// ---- Ajustes (valores relativos à altura da tela, para valer em qualquer aparelho) ----
-		public static float Opacity = 0.45f;          // 0..1 (analógico)
-		/// <summary>Opacidade dos botões pixel art, derivada de Opacity (a opção da tela inicial): o padrão de 45% vira 90%, 0% some e 100% fica sólido.</summary>
+		public static float Opacity = 0.45f;
 		public static float ButtonOpacity => Opacity <= 0.45f ? Opacity / 0.45f * 0.9f : Math.Min(1f, 0.9f + (Opacity - 0.45f) / 0.55f * 0.1f);
-		public static float ButtonSize = 0.17f;       // diâmetro dos botões
-		public static float StickRadius = 0.13f;      // alcance do analógico
-		public static float StickDeadZone = 0.18f;    // fração do alcance ignorada
-		public static float StickGrabRadius = 2.6f;   // área que "pega" o analógico (zona externa invisível), em múltiplos do alcance
-		public static float StickX = 0.30f;           // posição fixa do centro (x), em múltiplos da altura da tela
-		public static float StickBottom = 0.28f;      // distância do centro até a borda de baixo, em múltiplos da altura
+		public static float ButtonSize = 0.17f;
+		public static float StickRadius = 0.13f;
+		public static float StickDeadZone = 0.18f;
+		public static float StickGrabRadius = 2.6f;
+		public static float StickX = 0.30f;
+		public static float StickBottom = 0.28f;
 		public static bool Enabled = true;
 
-		// Opções vindas da tela inicial (menu "Opções" e editor de controles), via HostConfig.
 		private static bool showFps;
 
-		// Posição do contador de FPS (salva pelo editor em touch_layout.txt, linha "fps=canto,mx,my,escala").
-		// Canto: 0 = sup. esquerdo, 1 = sup. direito, 2 = inf. esquerdo, 3 = inf. direito (bit 0 = direita, bit 1 = baixo).
-		// mx/my = distância até a borda, em fração da largura/altura da tela; negativo = margem padrão.
 		private static int fpsCorner;
 		private static float fpsMx = -1f, fpsMy = -1f, fpsScale = 1f;
 
@@ -54,7 +41,7 @@ namespace CelesteAndroid
 		private struct Finger
 		{
 			public long Key;
-			public Vector2 Pos; // pixels do backbuffer
+			public Vector2 Pos;
 		}
 
 		private static readonly List<Finger> fingers = new();
@@ -64,13 +51,12 @@ namespace CelesteAndroid
 
 		private static bool stickActive;
 		private static long stickKey;
-		private static Vector2 stickValue; // -1..1, Y para cima positivo (convenção do gamepad)
-		private static Vector2 stickKnob;  // deslocamento do botão interno em pixels (tela), limitado ao alcance; só visual
+		private static Vector2 stickValue;
+		private static Vector2 stickKnob;
 
 		private static int screenW = 1920, screenH = 1080;
 		private static bool realPadConnected;
 
-		// ---- SDL3 ----
 		[DllImport("SDL3", CallingConvention = CallingConvention.Cdecl)]
 		private static extern IntPtr SDL_GetTouchDevices(out int count);
 
@@ -80,7 +66,6 @@ namespace CelesteAndroid
 		[DllImport("SDL3", CallingConvention = CallingConvention.Cdecl)]
 		private static extern void SDL_free(IntPtr mem);
 
-		/// <summary>Chamado a cada GetState; refaz a leitura no máximo 1x por ~4 ms.</summary>
 		private static void Poll()
 		{
 			if (!layoutLoaded)
@@ -105,7 +90,6 @@ namespace CelesteAndroid
 						IntPtr f = Marshal.ReadIntPtr(list, i * IntPtr.Size);
 						if (f == IntPtr.Zero)
 							continue;
-						// SDL_Finger { SDL_FingerID id (u64); float x, y, pressure; } com x/y em 0..1.
 						long id = Marshal.ReadInt64(f, 0);
 						float x = BitConverter.Int32BitsToSingle(Marshal.ReadInt32(f, 8));
 						float y = BitConverter.Int32BitsToSingle(Marshal.ReadInt32(f, 12));
@@ -119,15 +103,12 @@ namespace CelesteAndroid
 			Resolve();
 		}
 
-		// ---- Layout: padrão + personalização salva pelo editor (ControlsEditorActivity) ----
-		// Índices 0..4 = Btn (Jump, Dash, Grab, Pause, Tab); 5 = analógico.
 		private const int StickIdx = 5;
 		private static readonly bool[] custom = new bool[6];
-		private static readonly Vector2[] customPos = new Vector2[6]; // centro, em frações da largura/altura da tela
+		private static readonly Vector2[] customPos = new Vector2[6];
 		private static readonly float[] customScale = { 1f, 1f, 1f, 1f, 1f, 1f };
 		private static bool layoutLoaded;
 
-		/// <summary>Lê touch_layout.txt (linhas "nome=x,y,escala"); sem arquivo, vale o layout padrão.</summary>
 		private static void LoadLayout()
 		{
 			layoutLoaded = true;
@@ -172,7 +153,6 @@ namespace CelesteAndroid
 			}
 			catch (Exception)
 			{
-				// Arquivo ilegível: segue com o layout padrão.
 			}
 		}
 
@@ -180,12 +160,10 @@ namespace CelesteAndroid
 		private static float Unit(Btn b) => BaseUnit * customScale[(int)b];
 		private static float StickRange => screenH * StickRadius * customScale[StickIdx];
 
-		// Analógico fixo: o centro nunca se move durante o jogo, só o botão interno acompanha o dedo.
 		private static Vector2 StickBase => custom[StickIdx]
 			? new Vector2(customPos[StickIdx].X * screenW, customPos[StickIdx].Y * screenH)
 			: new Vector2(screenH * StickX, screenH * (1f - StickBottom));
 
-		// Padrão: manter em sincronia com ControlsCanvas.SetDefaults (Celeste.Android).
 		private static Vector2 Center(Btn b)
 		{
 			if (custom[(int)b])
@@ -208,7 +186,6 @@ namespace CelesteAndroid
 		{
 			foreach (Btn b in Enum.GetValues(typeof(Btn)))
 			{
-				// 25% de folga: o dedo nunca acerta exatamente no meio.
 				if (Vector2.Distance(p, Center(b)) <= Radius(b) * 1.25f)
 				{
 					which = b;
@@ -223,7 +200,6 @@ namespace CelesteAndroid
 		{
 			Array.Clear(pressed, 0, pressed.Length);
 
-			// Solta o analógico se o dedo que o controlava sumiu.
 			if (stickActive)
 			{
 				bool found = false;
@@ -262,9 +238,8 @@ namespace CelesteAndroid
 			float range = StickRange;
 			Vector2 delta = pos - StickBase;
 			float dist = delta.Length();
-			float len = Math.Min(dist, range); // passou do alcance: o valor trava no máximo, a base não sai do lugar
+			float len = Math.Min(dist, range);
 			Vector2 dir = delta / Math.Max(dist, 0.0001f);
-			// Visual: o botão interno segue o dedo de verdade (sem a zona morta), preso dentro do aro.
 			stickKnob = dir * len;
 			float amount = len / range;
 			if (amount < StickDeadZone)
@@ -276,25 +251,20 @@ namespace CelesteAndroid
 			stickValue = new Vector2(dir.X * amount, -dir.Y * amount);
 		}
 
-		// ---- Estado de gamepad sintético ----
 		private static GamePadState Synthesize()
 		{
 			Vector2 s = stickValue;
 			List<Buttons> down = new(8);
 			if (pressed[(int)Btn.Jump]) down.Add(Buttons.A);
-			// Dash manda X e B: o Celeste usa B para dash, para falar com NPCs e para voltar nos menus.
 			if (pressed[(int)Btn.Dash]) { down.Add(Buttons.X); down.Add(Buttons.B); }
 			if (pressed[(int)Btn.Pause]) down.Add(Buttons.Start);
-			// Direcional digital a partir do analógico: os menus do Celeste navegam pelo D-pad/analógico.
 			if (s.Y > 0.5f) down.Add(Buttons.DPadUp);
 			if (s.Y < -0.5f) down.Add(Buttons.DPadDown);
 			if (s.X < -0.5f) down.Add(Buttons.DPadLeft);
 			if (s.X > 0.5f) down.Add(Buttons.DPadRight);
-			// Tab (diário): no Celeste o Journal fica no gatilho esquerdo do controle (e na tecla Tab no teclado).
 			return new GamePadState(s, Vector2.Zero, pressed[(int)Btn.Tab] ? 1f : 0f, pressed[(int)Btn.Grab] ? 1f : 0f, down.ToArray());
 		}
 
-		// ---- Chamado pelos shims ----
 		public static GamePadState GetState(PlayerIndex index, Func<GamePadState> real)
 		{
 			GamePadState realState = real();
@@ -305,7 +275,6 @@ namespace CelesteAndroid
 			return Synthesize();
 		}
 
-		// ---- Overlay ----
 		private static SpriteBatch? batch;
 		private static Texture2D? disc, ring, glow, pixel;
 		private static readonly Texture2D?[] sprites = new Texture2D?[5];
@@ -347,7 +316,6 @@ namespace CelesteAndroid
 
 			if (showControls)
 			{
-				// 1) Analógico fixo no canto inferior esquerdo + brilho suave atrás dos botões.
 				batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp, null, null);
 				Vector2 baseCenter = StickBase;
 				float range = StickRange;
@@ -359,7 +327,6 @@ namespace CelesteAndroid
 					DrawGlow(b);
 				batch.End();
 
-				// 2) Botões pixel art: amostragem por ponto, para os pixels ficarem nítidos.
 				batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, null, null);
 				foreach (Btn b in Enum.GetValues(typeof(Btn)))
 					DrawButton(b);
@@ -376,7 +343,6 @@ namespace CelesteAndroid
 			device.Viewport = saved;
 		}
 
-		// ---- Contador de FPS ----
 		private static readonly Stopwatch fpsClock = Stopwatch.StartNew();
 		private static long fpsWindowStartMs;
 		private static int fpsFrames;
@@ -384,7 +350,6 @@ namespace CelesteAndroid
 
 		private static void DrawFps()
 		{
-			// Quadros desenhados por segundo, atualizado a cada 500 ms para o número não tremer.
 			fpsFrames++;
 			long now = fpsClock.ElapsedMilliseconds;
 			long elapsed = now - fpsWindowStartMs;
@@ -398,8 +363,7 @@ namespace CelesteAndroid
 			float baseCell = Math.Max(2f, screenH * 0.0045f);
 			float cell = baseCell * fpsScale;
 			string text = $"{fpsValue} FPS";
-			float w = (text.Length * 6f - 1f) * cell, h = 7f * cell; // mesma conta do ControlsCanvas.FpsRect (editor)
-			// Sem posição salva: margem padrão de 3 células. Nos cantos da direita/de baixo o texto cresce para dentro da tela.
+			float w = (text.Length * 6f - 1f) * cell, h = 7f * cell;
 			float mx = fpsMx >= 0f ? fpsMx * screenW : baseCell * 3f;
 			float my = fpsMy >= 0f ? fpsMy * screenH : baseCell * 3f;
 			float x = (fpsCorner & 1) == 1 ? screenW - mx - w : mx;
@@ -407,7 +371,6 @@ namespace CelesteAndroid
 			DrawText(text, new Vector2(x, y), cell, Color.White);
 		}
 
-		// Fonte 5x7 só para o contador (o glifo 'P' do botão de pausa são duas barras, por isso é separada).
 		private static readonly Dictionary<char, string[]> textGlyphs = new()
 		{
 			['0'] = new[] { "01110", "10001", "10011", "10101", "11001", "10001", "01110" },
@@ -425,7 +388,6 @@ namespace CelesteAndroid
 			['S'] = new[] { "01111", "10000", "10000", "01110", "00001", "00001", "11110" },
 		};
 
-		/// <summary>Texto com sombra (legível sobre qualquer cenário); topLeft e cell em pixels.</summary>
 		private static void DrawText(string text, Vector2 topLeft, float cell, Color color)
 		{
 			DrawTextPass(text, topLeft + new Vector2(cell * 0.5f), cell, Color.Black * 0.75f);
@@ -444,18 +406,16 @@ namespace CelesteAndroid
 							if (rows[y][col] == '1')
 								batch!.Draw(pixel!, new Rectangle((int)(x + col * cell), (int)(topLeft.Y + y * cell), (int)Math.Ceiling(cell), (int)Math.Ceiling(cell)), color);
 				}
-				x += cell * 6f; // 5 colunas + 1 de espaço (o espaço em branco cai aqui também)
+				x += cell * 6f;
 			}
 		}
 
-		/// <summary>Retângulo do sprite: o tamanho é sempre múltiplo de 28 px, para cada "pixel" da arte cair num número inteiro de pixels da tela.</summary>
 		private static Rectangle SpriteRect(Btn b)
 		{
 			int n = PixelButtonArt.Size;
 			int cell = Math.Max(1, (int)Math.Round(Radius(b) * 2f / n));
 			int size = cell * n;
 			Vector2 c = Center(b);
-			// Apertado: o botão "afunda" um pixel da arte.
 			int y = (int)Math.Round(c.Y - size / 2f) + (pressed[(int)b] ? cell : 0);
 			return new Rectangle((int)Math.Round(c.X - size / 2f), y, size, size);
 		}
@@ -481,7 +441,6 @@ namespace CelesteAndroid
 			batch!.Draw(tex, new Rectangle((int)(center.X - radius), (int)(center.Y - radius), (int)(radius * 2), (int)(radius * 2)), color);
 		}
 
-		/// <summary>Monta a textura 28x28 a partir do mapa de caracteres de PixelButtonArt (alfa já pré-multiplicado: tudo é opaco ou transparente).</summary>
 		private static Texture2D MakeSprite(GraphicsDevice device, PixelButtonArt.Sprite s)
 		{
 			int n = PixelButtonArt.Size;
@@ -499,7 +458,6 @@ namespace CelesteAndroid
 			return tex;
 		}
 
-		/// <summary>Disco branco com borda bem suave (pré-multiplicado), usado como brilho colorido atrás dos botões.</summary>
 		private static Texture2D MakeGlow(GraphicsDevice device, int size)
 		{
 			Color[] data = new Color[size * size];
@@ -519,7 +477,6 @@ namespace CelesteAndroid
 			return tex;
 		}
 
-		/// <summary>Círculo com alfa pré-multiplicado (o SpriteBatch padrão usa AlphaBlend pré-multiplicado). ringWidth 0 = disco cheio.</summary>
 		private static Texture2D MakeCircle(GraphicsDevice device, int size, float ringWidth)
 		{
 			Color[] data = new Color[size * size];
@@ -529,7 +486,7 @@ namespace CelesteAndroid
 				for (int x = 0; x < size; x++)
 				{
 					float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(r, r)) / r;
-					float alpha = Math.Clamp((1f - d) * r, 0f, 1f); // borda suave de ~1px
+					float alpha = Math.Clamp((1f - d) * r, 0f, 1f);
 					if (ringWidth > 0f)
 						alpha *= Math.Clamp((d - (1f - ringWidth)) * r, 0f, 1f);
 					byte v = (byte)(alpha * 255f);
@@ -542,10 +499,6 @@ namespace CelesteAndroid
 		}
 	}
 
-	/// <summary>
-	/// Religa as chamadas do Celeste a GamePad.GetState para o estado com toque.
-	/// A leitura real do FNA é feita por reflexão (uma chamada direta seria religada para cá: recursão infinita).
-	/// </summary>
 	public static class GamePadShim
 	{
 		private static readonly MethodInfo? realGetState =

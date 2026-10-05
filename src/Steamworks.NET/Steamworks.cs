@@ -1,5 +1,3 @@
-// Stub do Steamworks.NET. Só os membros referenciados pelo Celeste 1.4.0.0;
-// as assinaturas precisam bater exatamente com as do assembly original.
 namespace Steamworks
 {
 	public struct AppId_t

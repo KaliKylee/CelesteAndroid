@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-	<!-- Substitui o Steamworks.NET real: mesmos nomes/assinaturas que o Celeste usa, sem Steam. -->
 	<PropertyGroup>
 		<TargetFramework>netstandard2.0</TargetFramework>
 		<AssemblyName>Steamworks.NET</AssemblyName>

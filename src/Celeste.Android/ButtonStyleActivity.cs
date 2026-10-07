@@ -332,27 +332,45 @@ namespace CelesteAndroid
 			return card;
 		}
 
+		private static readonly string[] KeyList = BuildKeyList();
+
+		private static string[] BuildKeyList()
+		{
+			var keys = new List<string> { "-" };
+			for (char c = 'A'; c <= 'Z'; c++)
+				keys.Add(c.ToString());
+			for (int i = 0; i <= 9; i++)
+				keys.Add("D" + i);
+			keys.AddRange(new[] { "Space", "Enter", "Tab", "Escape", "Back", "Up", "Down", "Left", "Right",
+				"LeftShift", "RightShift", "LeftControl", "RightControl", "LeftAlt", "RightAlt" });
+			for (int i = 1; i <= 12; i++)
+				keys.Add("F" + i);
+			for (int i = 0; i <= 9; i++)
+				keys.Add("NumPad" + i);
+			keys.AddRange(new[] { "OemComma", "OemPeriod", "OemQuestion", "OemSemicolon", "OemQuotes", "OemOpenBrackets",
+				"OemCloseBrackets", "OemPipe", "OemMinus", "OemPlus", "OemTilde", "PageUp", "PageDown", "Home", "End", "Insert", "Delete" });
+			return keys.ToArray();
+		}
+
 		private void CaptureKey(int idx, Button target)
 		{
+			string[] labels = new string[KeyList.Length];
+			for (int i = 0; i < labels.Length; i++)
+				labels[i] = ButtonStyles.Display(KeyList[i]);
+			int current = Math.Max(0, Array.IndexOf(KeyList, styles[idx].Key));
 			var dialog = new AlertDialog.Builder(this)!
-				.SetMessage(L.PressAKey)!
+				.SetTitle(L.KeyboardKey)!
+				.SetSingleChoiceItems(labels, current, (IDialogInterfaceOnClickListener?)null)!
 				.SetNegativeButton(L.Cancel, (IDialogInterfaceOnClickListener?)null)!
 				.Create()!;
-			dialog.KeyPress += (_, e) =>
-			{
-				e.Handled = false;
-				if (e.Event?.Action != KeyEventActions.Down || e.KeyCode == Keycode.Back)
-					return;
-				string? name = ButtonStyles.ToXnaKey(e.KeyCode);
-				if (name == null)
-					return;
-				styles[idx].Key = name;
-				target.Text = ButtonStyles.Display(name);
-				e.Handled = true;
-				dialog.Dismiss();
-				HideSystemBars();
-			};
+			dialog.DismissEvent += (_, _) => HideSystemBars();
 			dialog.Show();
+			dialog.ListView!.ItemClick += (_, e) =>
+			{
+				styles[idx].Key = KeyList[e.Position];
+				target.Text = ButtonStyles.Display(styles[idx].Key);
+				dialog.Dismiss();
+			};
 		}
 
 		private TextView Text(string text, float sp, Color color, bool bold)

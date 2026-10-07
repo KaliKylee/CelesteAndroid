@@ -66,6 +66,59 @@ namespace CelesteAndroid
 		[DllImport("SDL3", CallingConvention = CallingConvention.Cdecl)]
 		private static extern void SDL_free(IntPtr mem);
 
+		private static readonly Keys?[] btnKey = new Keys?[5];
+		private static readonly Color?[] btnColor = new Color?[5];
+		private static readonly float[] btnOpacity = { -1f, -1f, -1f, -1f, -1f };
+
+		private static void LoadButtonStyle(string layoutPath)
+		{
+			try
+			{
+				string file = Path.Combine(Path.GetDirectoryName(layoutPath) ?? "", "button_style.txt");
+				if (!File.Exists(file))
+					return;
+				foreach (string line in File.ReadAllLines(file))
+				{
+					string[] kv = line.Split('=');
+					if (kv.Length != 2)
+						continue;
+					int idx = kv[0].Trim() switch { "jump" => 0, "dash" => 1, "grab" => 2, "pause" => 3, "tab" => 4, _ => -1 };
+					string[] v = kv[1].Split(',');
+					if (idx < 0 || v.Length != 3)
+						continue;
+					btnKey[idx] = Enum.TryParse(v[0].Trim(), out Keys k) && v[0].Trim() != "-" ? k : null;
+					if (v[1].Trim().Length == 6 && int.TryParse(v[1].Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int rgb))
+						btnColor[idx] = new Color((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255);
+					else
+						btnColor[idx] = null;
+					btnOpacity[idx] = int.TryParse(v[2].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int op) && op >= 0
+						? Math.Clamp(op, 0, 100) / 100f : -1f;
+				}
+			}
+			catch (Exception)
+			{
+			}
+		}
+
+		private static float OpacityOf(Btn b)
+		{
+			float o = btnOpacity[(int)b];
+			if (o < 0f)
+				return ButtonOpacity;
+			return o <= 0.45f ? o / 0.45f * 0.9f : Math.Min(1f, 0.9f + (o - 0.45f) / 0.55f * 0.1f);
+		}
+
+		private static void ApplyKeyboard()
+		{
+			KeyboardState ks = Keyboard.GetState();
+			for (int i = 0; i < btnKey.Length; i++)
+			{
+				Keys? k = btnKey[i];
+				if (k.HasValue && ks.IsKeyDown(k.Value))
+					pressed[i] = true;
+			}
+		}
+
 		private static void Poll()
 		{
 			if (!layoutLoaded)
@@ -101,6 +154,7 @@ namespace CelesteAndroid
 			}
 
 			Resolve();
+			ApplyKeyboard();
 		}
 
 		private const int StickIdx = 5;
@@ -115,6 +169,8 @@ namespace CelesteAndroid
 			try
 			{
 				string? path = HostConfig.TouchLayoutPath;
+				if (path != null)
+					LoadButtonStyle(path);
 				if (path == null || !File.Exists(path))
 					return;
 				foreach (string line in File.ReadAllLines(path))
@@ -423,17 +479,17 @@ namespace CelesteAndroid
 		private static void DrawGlow(Btn b)
 		{
 			int rgb = SpriteOf(b).GlowRgb;
-			Color tint = new Color((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255);
+			Color tint = btnColor[(int)b] ?? new Color((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255);
 			Rectangle r = SpriteRect(b);
 			int g = (int)(r.Width * 1.35f);
-			float alpha = ButtonOpacity * (pressed[(int)b] ? 0.75f : 0.55f);
+			float alpha = OpacityOf(b) * (pressed[(int)b] ? 0.75f : 0.55f);
 			batch!.Draw(glow!, new Rectangle(r.Center.X - g / 2, r.Center.Y - g / 2, g, g), tint * alpha);
 		}
 
 		private static void DrawButton(Btn b)
 		{
-			float alpha = pressed[(int)b] ? 1f : ButtonOpacity;
-			batch!.Draw(sprites[(int)b]!, SpriteRect(b), Color.White * alpha);
+			float alpha = pressed[(int)b] ? 1f : OpacityOf(b);
+			batch!.Draw(sprites[(int)b]!, SpriteRect(b), (btnColor[(int)b] ?? Color.White) * alpha);
 		}
 
 		private static void DrawCircle(Texture2D tex, Vector2 center, float radius, Color color)

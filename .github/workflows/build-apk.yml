@@ -126,7 +126,9 @@ jobs:
           $dir = Join-Path $env:USERPROFILE '.celeste-android'
           New-Item -ItemType Directory -Force $dir | Out-Null
           $ks = Join-Path $dir 'release.keystore'
-          [IO.File]::WriteAllBytes($ks, [Convert]::FromBase64String($env:KEYSTORE_BASE64))
+          # Remove espaços, quebras de linha e qualquer caractere que não seja base64 (comum ao colar do celular)
+          $b64 = $env:KEYSTORE_BASE64 -replace '[^A-Za-z0-9+/=]', ''
+          [IO.File]::WriteAllBytes($ks, [Convert]::FromBase64String($b64))
           @("CELESTE_KEYSTORE=$ks", "CELESTE_KEYSTORE_ALIAS=$env:KEYSTORE_ALIAS", "CELESTE_KEYSTORE_PASS=$env:KEYSTORE_PASSWORD") |
             Set-Content (Join-Path $dir 'keystore.env')
 

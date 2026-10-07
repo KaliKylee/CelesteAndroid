@@ -273,6 +273,7 @@ namespace CelesteAndroid
 			sb.Append("hide_touch=").Append(GameOptions.HideTouch(prefs) ? '1' : '0').Append('\n');
 			sb.Append("[layout]\n").Append(ReadOrEmpty(GameInstaller.TouchLayoutFile(this)).Replace("\r", "").TrimEnd('\n')).Append('\n');
 			sb.Append("[style]\n").Append(ReadOrEmpty(GameInstaller.ButtonStyleFile(this)).Replace("\r", "").TrimEnd('\n')).Append('\n');
+			sb.Append("[custom]\n").Append(ReadOrEmpty(GameInstaller.CustomButtonsFile(this)).Replace("\r", "").TrimEnd('\n')).Append('\n');
 
 			using Stream? output = ContentResolver!.OpenOutputStream(uri, "wt");
 			if (output == null)
@@ -298,6 +299,7 @@ namespace CelesteAndroid
 
 			var layout = new List<string>();
 			var style = new List<string>();
+			var custom = new List<string>();
 			var options = new Dictionary<string, int>();
 			string section = "";
 			for (int i = 1; i < lines.Length; i++)
@@ -317,6 +319,7 @@ namespace CelesteAndroid
 				{
 					case "[layout]": layout.Add(line); break;
 					case "[style]": style.Add(line); break;
+					case "[custom]": custom.Add(line); break;
 					case "[options]":
 						if (int.TryParse(kv[1].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int v))
 							options[kv[0].Trim()] = v;
@@ -326,6 +329,7 @@ namespace CelesteAndroid
 
 			WriteOrDelete(GameInstaller.TouchLayoutFile(this), layout);
 			WriteOrDelete(GameInstaller.ButtonStyleFile(this), style);
+			WriteOrDelete(GameInstaller.CustomButtonsFile(this), custom);
 
 			ISharedPreferences prefs = GameOptions.Prefs(this);
 			if (options.TryGetValue("opacity", out int op))

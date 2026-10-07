@@ -37,6 +37,8 @@ namespace CelesteAndroid
 		public static string UserDir(Context context) => Path.Combine(Files(context), "userdata");
 		public static string TouchLayoutFile(Context context) => Path.Combine(Files(context), "touch_layout.txt");
 
+		public static string CustomButtonsFile(Context context) => Path.Combine(Files(context), "custom_buttons.txt");
+
 		public static string ButtonStyleFile(Context context) => Path.Combine(Files(context), "button_style.txt");
 
 		public static bool IsInstalled(Context context) =>

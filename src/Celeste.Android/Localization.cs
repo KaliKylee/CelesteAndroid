@@ -334,6 +334,66 @@ namespace CelesteAndroid
 			"文件无效或读写出错。",
 			"잘못된 파일이거나 읽기/쓰기 오류입니다.");
 
+		public static string CustomButtons => T(
+			"Botões personalizados",
+			"Custom buttons",
+			"Botones personalizados",
+			"カスタムボタン",
+			"Boutons personnalisés",
+			"Pulsanti personalizzati",
+			"Eigene Tasten",
+			"Свои кнопки",
+			"自定义按钮",
+			"사용자 버튼");
+
+		public static string DefaultButtons => T(
+			"Botões padrão",
+			"Default buttons",
+			"Botones predeterminados",
+			"標準ボタン",
+			"Boutons par défaut",
+			"Pulsanti predefiniti",
+			"Standardtasten",
+			"Стандартные кнопки",
+			"默认按钮",
+			"기본 버튼");
+
+		public static string AddButton => T(
+			"Adicionar botão",
+			"Add button",
+			"Añadir botón",
+			"ボタンを追加",
+			"Ajouter un bouton",
+			"Aggiungi pulsante",
+			"Taste hinzufügen",
+			"Добавить кнопку",
+			"添加按钮",
+			"버튼 추가");
+
+		public static string RemoveButton => T(
+			"Remover",
+			"Remove",
+			"Quitar",
+			"削除",
+			"Supprimer",
+			"Rimuovi",
+			"Entfernen",
+			"Удалить",
+			"删除",
+			"삭제");
+
+		public static string Size => T(
+			"Tamanho",
+			"Size",
+			"Tamaño",
+			"サイズ",
+			"Taille",
+			"Dimensione",
+			"Größe",
+			"Размер",
+			"大小",
+			"크기");
+
 		public static string ShowFps => T(
 			"Mostrar FPS",
 			"Show FPS",

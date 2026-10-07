@@ -4,7 +4,6 @@ using Android.Content;
 
 namespace CelesteAndroid
 {
-	// ATENÇÃO: não mude a ordem dos itens (o nome é salvo nas preferências); só acrescente no fim.
 	public enum Lang { Pt, En, Es, Ja, Fr, It, De, Ru, Zh, Ko }
 
 	public static class L
@@ -81,7 +80,6 @@ namespace CelesteAndroid
 			};
 		}
 
-		// Ordem dos argumentos: pt, en, es, ja, fr, it, de, ru, zh, ko
 		private static TValue V<TValue>(TValue pt, TValue en, TValue es, TValue ja, TValue fr, TValue it, TValue de, TValue ru, TValue zh, TValue ko) => Current switch
 		{
 			Lang.Pt => pt,

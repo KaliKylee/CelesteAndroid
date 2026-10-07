@@ -70,8 +70,116 @@ namespace CelesteAndroid
 		private static readonly Color?[] btnColor = new Color?[5];
 		private static readonly float[] btnOpacity = { -1f, -1f, -1f, -1f, -1f };
 
+		private struct CustomBtn
+		{
+			public Keys? Key;
+			public Color Color;
+			public float Opacity; // -1 = geral
+			public float X, Y, Scale;
+			public string Label;
+		}
+
+		private static readonly List<CustomBtn> customBtns = new();
+		private static bool[] customPressed = new bool[0];
+
+		private static readonly MethodInfo? realKbGetState = typeof(Keyboard).GetMethod("GetState", Type.EmptyTypes);
+
+		private static KeyboardState RealKeyboard() => (KeyboardState)realKbGetState!.Invoke(null, null)!;
+
+		private static string LabelOf(Keys? key)
+		{
+			if (!key.HasValue)
+				return "";
+			string n = key.Value.ToString();
+			if (n.Length == 2 && n[0] == 'D' && char.IsDigit(n[1])) return n.Substring(1);
+			if (n.StartsWith("NumPad")) return "N" + n.Substring(6);
+			return n switch
+			{
+				"Space" => "SPC", "Enter" => "ENT", "Escape" => "ESC", "Back" => "BS", "Up" => "UP", "Down" => "DN",
+				"Left" => "LT", "Right" => "RT", "LeftShift" => "LSH", "RightShift" => "RSH", "LeftControl" => "LCT",
+				"RightControl" => "RCT", "LeftAlt" => "LAL", "RightAlt" => "RAL", "PageUp" => "PGU", "PageDown" => "PGD",
+				"Home" => "HOM", "Insert" => "INS", "Delete" => "DEL",
+				_ => n.StartsWith("Oem") ? "SYM" : n.ToUpperInvariant(),
+			};
+		}
+
+		private static void LoadCustomButtons(string layoutPath)
+		{
+			customBtns.Clear();
+			try
+			{
+				string file = Path.Combine(Path.GetDirectoryName(layoutPath) ?? "", "custom_buttons.txt");
+				if (!File.Exists(file))
+					return;
+				foreach (string line in File.ReadAllLines(file))
+				{
+					string[] kv = line.Split('=');
+					if (kv.Length != 2 || !kv[0].Trim().StartsWith("c"))
+						continue;
+					string[] v = kv[1].Split(',');
+					if (v.Length != 6 || customBtns.Count >= 12)
+						continue;
+					Keys? key = v[0].Trim() != "-" && Enum.TryParse(v[0].Trim(), out Keys k) ? k : null;
+					int rgb = 0x4DA3FF;
+					if (v[1].Trim().Length == 6)
+						int.TryParse(v[1].Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out rgb);
+					float F(string t, float d) => float.TryParse(t.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float r) ? r : d;
+					float op = F(v[2], -1f);
+					customBtns.Add(new CustomBtn
+					{
+						Key = key,
+						Color = new Color((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255),
+						Opacity = op < 0f ? -1f : Math.Clamp(op, 0f, 100f) / 100f,
+						X = Math.Clamp(F(v[3], 50f), 0f, 100f) / 100f,
+						Y = Math.Clamp(F(v[4], 50f), 0f, 100f) / 100f,
+						Scale = Math.Clamp(F(v[5], 100f), 40f, 250f) / 100f,
+						Label = LabelOf(key),
+					});
+				}
+			}
+			catch (Exception)
+			{
+			}
+			customPressed = new bool[customBtns.Count];
+		}
+
+		private static float CustomRadius(int i) => 0.5f * BaseUnit * customBtns[i].Scale;
+
+		private static Vector2 CustomCenter(int i) => new Vector2(customBtns[i].X * screenW, customBtns[i].Y * screenH);
+
+		private static bool InsideCustom(Vector2 p, out int which)
+		{
+			for (int i = customBtns.Count - 1; i >= 0; i--)
+			{
+				if (Vector2.Distance(p, CustomCenter(i)) <= CustomRadius(i) * 1.15f)
+				{
+					which = i;
+					return true;
+				}
+			}
+			which = -1;
+			return false;
+		}
+
+		public static KeyboardState AugmentKeyboard(KeyboardState real)
+		{
+			if (!Enabled || realPadConnected || customBtns.Count == 0)
+				return real;
+			List<Keys>? extra = null;
+			for (int i = 0; i < customBtns.Count && i < customPressed.Length; i++)
+			{
+				if (customPressed[i] && customBtns[i].Key.HasValue)
+					(extra ??= new List<Keys>()).Add(customBtns[i].Key!.Value);
+			}
+			if (extra == null)
+				return real;
+			extra.AddRange(real.GetPressedKeys());
+			return new KeyboardState(extra.ToArray());
+		}
+
 		private static void LoadButtonStyle(string layoutPath)
 		{
+			LoadCustomButtons(layoutPath);
 			try
 			{
 				string file = Path.Combine(Path.GetDirectoryName(layoutPath) ?? "", "button_style.txt");
@@ -110,7 +218,7 @@ namespace CelesteAndroid
 
 		private static void ApplyKeyboard()
 		{
-			KeyboardState ks = Keyboard.GetState();
+			KeyboardState ks = RealKeyboard();
 			for (int i = 0; i < btnKey.Length; i++)
 			{
 				Keys? k = btnKey[i];
@@ -255,6 +363,7 @@ namespace CelesteAndroid
 		private static void Resolve()
 		{
 			Array.Clear(pressed, 0, pressed.Length);
+			Array.Clear(customPressed, 0, customPressed.Length);
 
 			if (stickActive)
 			{
@@ -279,6 +388,10 @@ namespace CelesteAndroid
 				if (InsideButton(f.Pos, out Btn b))
 				{
 					pressed[(int)b] = true;
+				}
+				else if (InsideCustom(f.Pos, out int ci))
+				{
+					customPressed[ci] = true;
 				}
 				else if (!stickActive && Vector2.Distance(f.Pos, StickBase) <= StickRange * StickGrabRadius)
 				{
@@ -381,6 +494,7 @@ namespace CelesteAndroid
 				DrawCircle(disc!, knob, range * 0.45f, Color.White * (a * 1.1f));
 				foreach (Btn b in Enum.GetValues(typeof(Btn)))
 					DrawGlow(b);
+				DrawCustomButtons();
 				batch.End();
 
 				batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, null, null);
@@ -439,6 +553,29 @@ namespace CelesteAndroid
 			['7'] = new[] { "11111", "00001", "00010", "00100", "01000", "01000", "01000" },
 			['8'] = new[] { "01110", "10001", "10001", "01110", "10001", "10001", "01110" },
 			['9'] = new[] { "01110", "10001", "10001", "01111", "00001", "00010", "01100" },
+			['A'] = new[] { "01110", "10001", "10001", "11111", "10001", "10001", "10001" },
+			['B'] = new[] { "11110", "10001", "10001", "11110", "10001", "10001", "11110" },
+			['C'] = new[] { "01110", "10001", "10000", "10000", "10000", "10001", "01110" },
+			['D'] = new[] { "11110", "10001", "10001", "10001", "10001", "10001", "11110" },
+			['E'] = new[] { "11111", "10000", "10000", "11110", "10000", "10000", "11111" },
+			['G'] = new[] { "01110", "10001", "10000", "10111", "10001", "10001", "01111" },
+			['H'] = new[] { "10001", "10001", "10001", "11111", "10001", "10001", "10001" },
+			['I'] = new[] { "01110", "00100", "00100", "00100", "00100", "00100", "01110" },
+			['J'] = new[] { "00111", "00010", "00010", "00010", "00010", "10010", "01100" },
+			['K'] = new[] { "10001", "10010", "10100", "11000", "10100", "10010", "10001" },
+			['L'] = new[] { "10000", "10000", "10000", "10000", "10000", "10000", "11111" },
+			['M'] = new[] { "10001", "11011", "10101", "10101", "10001", "10001", "10001" },
+			['N'] = new[] { "10001", "11001", "10101", "10011", "10001", "10001", "10001" },
+			['O'] = new[] { "01110", "10001", "10001", "10001", "10001", "10001", "01110" },
+			['Q'] = new[] { "01110", "10001", "10001", "10001", "10101", "10010", "01101" },
+			['R'] = new[] { "11110", "10001", "10001", "11110", "10100", "10010", "10001" },
+			['T'] = new[] { "11111", "00100", "00100", "00100", "00100", "00100", "00100" },
+			['U'] = new[] { "10001", "10001", "10001", "10001", "10001", "10001", "01110" },
+			['V'] = new[] { "10001", "10001", "10001", "10001", "10001", "01010", "00100" },
+			['W'] = new[] { "10001", "10001", "10001", "10101", "10101", "11011", "10001" },
+			['X'] = new[] { "10001", "10001", "01010", "00100", "01010", "10001", "10001" },
+			['Y'] = new[] { "10001", "10001", "01010", "00100", "00100", "00100", "00100" },
+			['Z'] = new[] { "11111", "00001", "00010", "00100", "01000", "10000", "11111" },
 			['F'] = new[] { "11111", "10000", "10000", "11110", "10000", "10000", "10000" },
 			['P'] = new[] { "11110", "10001", "10001", "11110", "10000", "10000", "10000" },
 			['S'] = new[] { "01111", "10000", "10000", "01110", "00001", "00001", "11110" },
@@ -490,6 +627,27 @@ namespace CelesteAndroid
 		{
 			float alpha = pressed[(int)b] ? 1f : OpacityOf(b);
 			batch!.Draw(sprites[(int)b]!, SpriteRect(b), (btnColor[(int)b] ?? Color.White) * alpha);
+		}
+
+		private static void DrawCustomButtons()
+		{
+			for (int i = 0; i < customBtns.Count; i++)
+			{
+				CustomBtn c = customBtns[i];
+				bool down = i < customPressed.Length && customPressed[i];
+				float baseA = c.Opacity < 0f ? ButtonOpacity : (c.Opacity <= 0.45f ? c.Opacity / 0.45f * 0.9f : Math.Min(1f, 0.9f + (c.Opacity - 0.45f) / 0.55f * 0.1f));
+				float a = down ? 1f : baseA;
+				Vector2 center = CustomCenter(i);
+				float r = CustomRadius(i) * (down ? 0.94f : 1f);
+				DrawCircle(disc!, center, r, c.Color * a);
+				DrawCircle(ring!, center, r, Color.White * (a * 0.85f));
+				if (c.Label.Length == 0)
+					continue;
+				float cell = Math.Max(1f, Math.Min(r * 2f * 0.62f / (c.Label.Length * 6f - 1f), r * 2f * 0.1f));
+				float w = (c.Label.Length * 6f - 1f) * cell, h = 7f * cell;
+				float lum = (0.299f * c.Color.R + 0.587f * c.Color.G + 0.114f * c.Color.B) / 255f;
+				DrawText(c.Label, new Vector2(center.X - w / 2f, center.Y - h / 2f), cell, (lum > 0.6f ? Color.Black : Color.White) * Math.Max(a, 0.35f));
+			}
 		}
 
 		private static void DrawCircle(Texture2D tex, Vector2 center, float radius, Color color)
@@ -570,5 +728,14 @@ namespace CelesteAndroid
 		[MonoModLinkFrom("Microsoft.Xna.Framework.Input.GamePadState Microsoft.Xna.Framework.Input.GamePad::GetState(Microsoft.Xna.Framework.PlayerIndex,Microsoft.Xna.Framework.Input.GamePadDeadZone)")]
 		public static GamePadState GetState(PlayerIndex index, GamePadDeadZone deadZone)
 			=> TouchControls.GetState(index, () => (GamePadState)realGetStateDeadZone!.Invoke(null, new object[] { index, deadZone })!);
+	}
+
+	public static class KeyboardShim
+	{
+		private static readonly MethodInfo? realGetState = typeof(Keyboard).GetMethod("GetState", Type.EmptyTypes);
+
+		[MonoModLinkFrom("Microsoft.Xna.Framework.Input.KeyboardState Microsoft.Xna.Framework.Input.Keyboard::GetState()")]
+		public static KeyboardState GetState()
+			=> TouchControls.AugmentKeyboard((KeyboardState)realGetState!.Invoke(null, null)!);
 	}
 }

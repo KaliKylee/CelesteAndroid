@@ -190,6 +190,150 @@ namespace CelesteAndroid
 			"编辑控制",
 			"컨트롤 편집");
 
+		public static string IndividualButtons => T(
+			"Criar botões individualmente",
+			"Create buttons individually",
+			"Crear botones individualmente",
+			"ボタンを個別に作成",
+			"Créer les boutons individuellement",
+			"Crea i pulsanti singolarmente",
+			"Tasten einzeln erstellen",
+			"Создать кнопки отдельно",
+			"单独创建按钮",
+			"버튼 개별 설정");
+
+		public static string KeyboardKey => T(
+			"Tecla do teclado",
+			"Keyboard key",
+			"Tecla del teclado",
+			"キーボードのキー",
+			"Touche du clavier",
+			"Tasto della tastiera",
+			"Tastaturtaste",
+			"Клавиша клавиатуры",
+			"键盘按键",
+			"키보드 키");
+
+		public static string PressAKey => T(
+			"Pressione uma tecla…",
+			"Press a key…",
+			"Presiona una tecla…",
+			"キーを押してください…",
+			"Appuyez sur une touche…",
+			"Premi un tasto…",
+			"Taste drücken …",
+			"Нажмите клавишу…",
+			"请按下一个键…",
+			"키를 누르세요…");
+
+		public static string NoKey => T(
+			"Nenhuma",
+			"None",
+			"Ninguna",
+			"なし",
+			"Aucune",
+			"Nessuno",
+			"Keine",
+			"Нет",
+			"无",
+			"없음");
+
+		public static string ButtonColor => T(
+			"Cor",
+			"Color",
+			"Color",
+			"色",
+			"Couleur",
+			"Colore",
+			"Farbe",
+			"Цвет",
+			"颜色",
+			"색상");
+
+		public static string UseGlobalOpacity => T(
+			"Usar opacidade geral",
+			"Use global opacity",
+			"Usar opacidad general",
+			"共通の不透明度を使う",
+			"Utiliser l'opacité globale",
+			"Usa opacità generale",
+			"Globale Deckkraft nutzen",
+			"Общая прозрачность",
+			"使用全局不透明度",
+			"전체 투명도 사용");
+
+		public static string DefaultColor => T(
+			"Padrão",
+			"Default",
+			"Predeterminado",
+			"標準",
+			"Par défaut",
+			"Predefinito",
+			"Standard",
+			"По умолчанию",
+			"默认",
+			"기본");
+
+		public static string ExportControls => T(
+			"Exportar controles",
+			"Export controls",
+			"Exportar controles",
+			"コントロールを書き出す",
+			"Exporter les commandes",
+			"Esporta i controlli",
+			"Steuerung exportieren",
+			"Экспорт управления",
+			"导出控制",
+			"컨트롤 내보내기");
+
+		public static string ImportControls => T(
+			"Importar controles",
+			"Import controls",
+			"Importar controles",
+			"コントロールを読み込む",
+			"Importer les commandes",
+			"Importa i controlli",
+			"Steuerung importieren",
+			"Импорт управления",
+			"导入控制",
+			"컨트롤 가져오기");
+
+		public static string ControlsExported => T(
+			"Controles exportados!",
+			"Controls exported!",
+			"¡Controles exportados!",
+			"コントロールを書き出しました！",
+			"Commandes exportées !",
+			"Controlli esportati!",
+			"Steuerung exportiert!",
+			"Управление экспортировано!",
+			"控制已导出！",
+			"컨트롤을 내보냈습니다!");
+
+		public static string ControlsImported => T(
+			"Controles importados!",
+			"Controls imported!",
+			"¡Controles importados!",
+			"コントロールを読み込みました！",
+			"Commandes importées !",
+			"Controlli importati!",
+			"Steuerung importiert!",
+			"Управление импортировано!",
+			"控制已导入！",
+			"컨트롤을 가져왔습니다!");
+
+		public static string ImportInvalid => T(
+			"Arquivo inválido ou erro ao ler/gravar.",
+			"Invalid file or read/write error.",
+			"Archivo inválido o error de lectura/escritura.",
+			"無効なファイル、または読み書きエラーです。",
+			"Fichier invalide ou erreur de lecture/écriture.",
+			"File non valido o errore di lettura/scrittura.",
+			"Ungültige Datei oder Lese-/Schreibfehler.",
+			"Неверный файл или ошибка чтения/записи.",
+			"文件无效或读写出错。",
+			"잘못된 파일이거나 읽기/쓰기 오류입니다.");
+
 		public static string ShowFps => T(
 			"Mostrar FPS",
 			"Show FPS",

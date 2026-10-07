@@ -165,6 +165,16 @@ namespace CelesteAndroid
 			opacityRow.AddView(gridButton, new LinearLayout.LayoutParams(Dp(74 + 6 + 78 + 6 + 70), Dp(36)) { LeftMargin = Dp(8) });
 			bar.AddView(opacityRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
 
+			var shareRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+			shareRow.SetGravity(GravityFlags.CenterVertical | GravityFlags.End);
+			var exportBtn = MakeButton(L.ExportControls, filled: false);
+			exportBtn.Click += (_, _) => StartExport();
+			var importBtn = MakeButton(L.ImportControls, filled: false);
+			importBtn.Click += (_, _) => StartImport();
+			shareRow.AddView(exportBtn, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, Dp(34)));
+			shareRow.AddView(importBtn, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, Dp(34)) { LeftMargin = Dp(8) });
+			bar.AddView(shareRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(4) });
+
 			fpsRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
 			fpsRow.SetGravity(GravityFlags.CenterVertical);
 			fpsCornerButton = MakeButton("", filled: false);
@@ -192,6 +202,155 @@ namespace CelesteAndroid
 
 			return root;
 		}
+
+		#region Exportar / importar HUD
+
+		private const int RequestExport = 11, RequestImport = 12;
+		private const string HudHeader = "CELESTE_HUD_V1";
+
+		private void StartExport()
+		{
+			var intent = new Intent(Intent.ActionCreateDocument);
+			intent.AddCategory(Intent.CategoryOpenable);
+			intent.SetType("text/plain");
+			intent.PutExtra(Intent.ExtraTitle, "celeste-hud.txt");
+			StartActivityForResult(intent, RequestExport);
+		}
+
+		private void StartImport()
+		{
+			var intent = new Intent(Intent.ActionOpenDocument);
+			intent.AddCategory(Intent.CategoryOpenable);
+			intent.SetType("*/*");
+			StartActivityForResult(intent, RequestImport);
+		}
+
+		protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+		{
+			base.OnActivityResult(requestCode, resultCode, data);
+			Android.Net.Uri? uri = data?.Data;
+			if (resultCode != Result.Ok || uri == null)
+				return;
+			try
+			{
+				if (requestCode == RequestExport)
+				{
+					ExportTo(uri);
+					Toast.MakeText(this, L.ControlsExported, ToastLength.Short)?.Show();
+				}
+				else if (requestCode == RequestImport)
+				{
+					if (ImportFrom(uri))
+					{
+						Toast.MakeText(this, L.ControlsImported, ToastLength.Short)?.Show();
+						Recreate();
+					}
+					else
+						Toast.MakeText(this, L.ImportInvalid, ToastLength.Long)?.Show();
+				}
+			}
+			catch (Exception)
+			{
+				Toast.MakeText(this, L.ImportInvalid, ToastLength.Long)?.Show();
+			}
+		}
+
+		private static string ReadOrEmpty(string path) => File.Exists(path) ? File.ReadAllText(path) : "";
+
+		private void ExportTo(Android.Net.Uri uri)
+		{
+			// Grava o estado atual da tela (posições, tamanhos, FPS) antes de exportar.
+			canvas.Save();
+			ISharedPreferences prefs = GameOptions.Prefs(this);
+			GameOptions.SetOpacity(prefs, canvas.OpacityPercent);
+
+			var sb = new StringBuilder();
+			sb.Append(HudHeader).Append('\n');
+			sb.Append("[options]\n");
+			sb.Append("opacity=").Append(canvas.OpacityPercent.ToString(CultureInfo.InvariantCulture)).Append('\n');
+			sb.Append("grid=").Append(gridMode.ToString(CultureInfo.InvariantCulture)).Append('\n');
+			sb.Append("show_fps=").Append(GameOptions.ShowFps(prefs) ? '1' : '0').Append('\n');
+			sb.Append("hide_touch=").Append(GameOptions.HideTouch(prefs) ? '1' : '0').Append('\n');
+			sb.Append("[layout]\n").Append(ReadOrEmpty(GameInstaller.TouchLayoutFile(this)).Replace("\r", "").TrimEnd('\n')).Append('\n');
+			sb.Append("[style]\n").Append(ReadOrEmpty(GameInstaller.ButtonStyleFile(this)).Replace("\r", "").TrimEnd('\n')).Append('\n');
+
+			using Stream? output = ContentResolver!.OpenOutputStream(uri, "wt");
+			if (output == null)
+				throw new IOException();
+			byte[] bytes = new UTF8Encoding(false).GetBytes(sb.ToString());
+			output.Write(bytes, 0, bytes.Length);
+		}
+
+		private bool ImportFrom(Android.Net.Uri uri)
+		{
+			string text;
+			using (Stream? input = ContentResolver!.OpenInputStream(uri))
+			{
+				if (input == null)
+					return false;
+				using var reader = new StreamReader(input, Encoding.UTF8);
+				text = reader.ReadToEnd();
+			}
+
+			string[] lines = text.Replace("\r", "").Split('\n');
+			if (lines.Length == 0 || lines[0].Trim() != HudHeader)
+				return false;
+
+			var layout = new List<string>();
+			var style = new List<string>();
+			var options = new Dictionary<string, int>();
+			string section = "";
+			for (int i = 1; i < lines.Length; i++)
+			{
+				string line = lines[i].Trim();
+				if (line.Length == 0 || line.Length > 200)
+					continue;
+				if (line.StartsWith('[') && line.EndsWith(']'))
+				{
+					section = line;
+					continue;
+				}
+				string[] kv = line.Split('=');
+				if (kv.Length != 2)
+					continue;
+				switch (section)
+				{
+					case "[layout]": layout.Add(line); break;
+					case "[style]": style.Add(line); break;
+					case "[options]":
+						if (int.TryParse(kv[1].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int v))
+							options[kv[0].Trim()] = v;
+						break;
+				}
+			}
+
+			WriteOrDelete(GameInstaller.TouchLayoutFile(this), layout);
+			WriteOrDelete(GameInstaller.ButtonStyleFile(this), style);
+
+			ISharedPreferences prefs = GameOptions.Prefs(this);
+			if (options.TryGetValue("opacity", out int op))
+				GameOptions.SetOpacity(prefs, op);
+			if (options.TryGetValue("grid", out int grid))
+				prefs.Edit()!.PutInt(PrefGrid, Math.Clamp(grid, 0, 3))!.Apply();
+			if (options.TryGetValue("show_fps", out int fps))
+				GameOptions.SetShowFps(prefs, fps == 1);
+			if (options.TryGetValue("hide_touch", out int hide))
+				GameOptions.SetHideTouch(prefs, hide == 1);
+			return true;
+		}
+
+		private static void WriteOrDelete(string path, List<string> lines)
+		{
+			if (lines.Count == 0)
+			{
+				if (File.Exists(path))
+					File.Delete(path);
+				return;
+			}
+			File.WriteAllText(path, string.Join("\n", lines) + "\n");
+		}
+
+		#endregion
 
 		private void UpdateBar()
 		{

@@ -7,7 +7,7 @@
 		<ApplicationId>org.celesteandroid.celeste</ApplicationId>
 		<ApplicationTitle>Celeste</ApplicationTitle>
 		<ApplicationVersion>3</ApplicationVersion>
-		<ApplicationDisplayVersion>1.0.1</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.6.0</ApplicationDisplayVersion>
 		<RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>
 		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
 		<AndroidPackageFormat>apk</AndroidPackageFormat>

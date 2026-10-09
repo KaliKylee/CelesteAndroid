@@ -70,6 +70,41 @@ namespace CelesteAndroid
 		private static readonly Color?[] btnColor = new Color?[5];
 		private static readonly float[] btnOpacity = { -1f, -1f, -1f, -1f, -1f };
 
+		// Forma/ícone personalizados (0 = círculo, 1 = quadrado, 2 = retângulo)
+		private static readonly int[] btnShape = new int[5];
+		private static readonly float[] btnHeight = { 1f, 1f, 1f, 1f, 1f };
+		private static readonly string?[] btnIcon = new string?[5];
+		private static string iconDir = "";
+		private static readonly Texture2D?[] shapeTex = new Texture2D?[5];
+		private static readonly bool[] shapeBuilt = new bool[5];
+
+		private static bool Shaped(Btn b) => btnShape[(int)b] != 0 || btnIcon[(int)b] != null;
+
+		private static bool ValidIconName(string n)
+		{
+			if (n.Length < 5 || n.Length > 48 || !n.EndsWith(".png", StringComparison.Ordinal))
+				return false;
+			for (int i = 0; i < n.Length - 4; i++)
+				if (!char.IsLetterOrDigit(n[i]) && n[i] != '_')
+					return false;
+			return true;
+		}
+
+		private static void ParseShape(string key, string value)
+		{
+			int idx = key switch { "jump" => 0, "dash" => 1, "grab" => 2, "pause" => 3, "tab" => 4, _ => -1 };
+			string[] v = value.Split(',');
+			if (idx < 0 || v.Length != 3)
+				return;
+			if (!int.TryParse(v[0].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int shape)
+				|| !float.TryParse(v[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float hs))
+				return;
+			btnShape[idx] = Math.Clamp(shape, 0, 2);
+			btnHeight[idx] = Math.Clamp(hs, 0.4f, 2.5f);
+			string icon = v[2].Trim();
+			btnIcon[idx] = icon != "-" && ValidIconName(icon) && File.Exists(Path.Combine(iconDir, icon)) ? icon : null;
+		}
+
 		private struct CustomBtn
 		{
 			public Keys? Key;
@@ -278,7 +313,10 @@ namespace CelesteAndroid
 			{
 				string? path = HostConfig.TouchLayoutPath;
 				if (path != null)
+				{
+					iconDir = Path.Combine(Path.GetDirectoryName(path) ?? "", "touch_icons");
 					LoadButtonStyle(path);
+				}
 				if (path == null || !File.Exists(path))
 					return;
 				foreach (string line in File.ReadAllLines(path))
@@ -300,6 +338,12 @@ namespace CelesteAndroid
 							fpsMy = Math.Clamp(fmy, 0f, 0.5f);
 							fpsScale = Math.Clamp(fsc, 0.5f, 2f);
 						}
+						continue;
+					}
+					string layoutKey = kv[0].Trim();
+					if (layoutKey.StartsWith("shape_", StringComparison.Ordinal))
+					{
+						ParseShape(layoutKey.Substring(6), kv[1]);
 						continue;
 					}
 					int idx = kv[0].Trim() switch { "jump" => 0, "dash" => 1, "grab" => 2, "pause" => 3, "tab" => 4, "stick" => 5, _ => -1 };
@@ -344,13 +388,27 @@ namespace CelesteAndroid
 			};
 		}
 
+		private static float BaseDiameter(Btn b) => 2f * (b == Btn.Pause ? 0.32f : b == Btn.Tab ? 0.4f : 0.5f) * BaseUnit;
+
+		private static float BtnW(Btn b) => BaseDiameter(b) * customScale[(int)b];
+
+		private static float BtnH(Btn b) => BaseDiameter(b) * (btnShape[(int)b] == 2 ? btnHeight[(int)b] : customScale[(int)b]);
+
+		private static bool HitsButton(Vector2 p, Btn b)
+		{
+			Vector2 c = Center(b);
+			float nx = (p.X - c.X) / (BtnW(b) * 0.5f * 1.25f);
+			float ny = (p.Y - c.Y) / (BtnH(b) * 0.5f * 1.25f);
+			return btnShape[(int)b] != 0 ? Math.Max(Math.Abs(nx), Math.Abs(ny)) <= 1f : nx * nx + ny * ny <= 1f;
+		}
+
 		private static float Radius(Btn b) => (b == Btn.Pause ? 0.32f : b == Btn.Tab ? 0.4f : 0.5f) * Unit(b);
 
 		private static bool InsideButton(Vector2 p, out Btn which)
 		{
 			foreach (Btn b in Enum.GetValues(typeof(Btn)))
 			{
-				if (Vector2.Distance(p, Center(b)) <= Radius(b) * 1.25f)
+				if (HitsButton(p, b))
 				{
 					which = b;
 					return true;
@@ -615,6 +673,8 @@ namespace CelesteAndroid
 
 		private static void DrawGlow(Btn b)
 		{
+			if (Shaped(b))
+				return;
 			int rgb = SpriteOf(b).GlowRgb;
 			Color tint = btnColor[(int)b] ?? new Color((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255);
 			Rectangle r = SpriteRect(b);
@@ -625,6 +685,11 @@ namespace CelesteAndroid
 
 		private static void DrawButton(Btn b)
 		{
+			if (Shaped(b))
+			{
+				DrawShaped(b);
+				return;
+			}
 			float alpha = pressed[(int)b] ? 1f : OpacityOf(b);
 			batch!.Draw(sprites[(int)b]!, SpriteRect(b), (btnColor[(int)b] ?? Color.White) * alpha);
 		}
@@ -648,6 +713,157 @@ namespace CelesteAndroid
 				float lum = (0.299f * c.Color.R + 0.587f * c.Color.G + 0.114f * c.Color.B) / 255f;
 				DrawText(c.Label, new Vector2(center.X - w / 2f, center.Y - h / 2f), cell, (lum > 0.6f ? Color.Black : Color.White) * Math.Max(a, 0.35f));
 			}
+		}
+
+		private static string? ShapeLabel(Btn b) => b switch { Btn.Jump => "A", Btn.Dash => "X", Btn.Grab => "G", Btn.Tab => "TAB", _ => null };
+
+		private static void DrawShaped(Btn b)
+		{
+			Texture2D? tex = ShapeTexture(b);
+			if (tex == null)
+				return;
+			int i = (int)b;
+			bool down = pressed[i];
+			float alpha = down ? 1f : OpacityOf(b);
+			Vector2 c = Center(b);
+			float k = down ? 0.94f : 1f;
+			float w = BtnW(b) * k, h = BtnH(b) * k;
+			batch!.Draw(tex, new Rectangle((int)Math.Round(c.X - w / 2f), (int)Math.Round(c.Y - h / 2f), (int)Math.Round(w), (int)Math.Round(h)), Color.White * alpha);
+			if (btnIcon[i] != null)
+				return;
+
+			int rgb = SpriteOf(b).GlowRgb;
+			Color fill = btnColor[i] ?? new Color((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255);
+			float lum = (0.299f * fill.R + 0.587f * fill.G + 0.114f * fill.B) / 255f;
+			Color ink = (lum > 0.6f ? Color.Black : Color.White) * Math.Max(alpha, 0.35f);
+			float m = Math.Min(w, h);
+			if (b == Btn.Pause)
+			{
+				float bw = Math.Max(2f, m * 0.12f), bh = m * 0.42f, gap = m * 0.14f;
+				batch.Draw(pixel!, new Rectangle((int)(c.X - gap / 2f - bw), (int)(c.Y - bh / 2f), (int)bw, (int)bh), ink);
+				batch.Draw(pixel!, new Rectangle((int)(c.X + gap / 2f), (int)(c.Y - bh / 2f), (int)bw, (int)bh), ink);
+				return;
+			}
+			string label = ShapeLabel(b)!;
+			float cell = Math.Max(1f, Math.Min(m * 0.5f / 7f, w * 0.7f / (label.Length * 6f - 1f)));
+			float lw = (label.Length * 6f - 1f) * cell, lh = 7f * cell;
+			DrawText(label, new Vector2(c.X - lw / 2f, c.Y - lh / 2f), cell, ink);
+		}
+
+		private static Texture2D? ShapeTexture(Btn b)
+		{
+			int i = (int)b;
+			if (!shapeBuilt[i])
+			{
+				shapeBuilt[i] = true;
+				try
+				{
+					shapeTex[i] = BuildShapeTexture(batch!.GraphicsDevice, b);
+				}
+				catch (Exception)
+				{
+					shapeTex[i] = null;
+				}
+			}
+			return shapeTex[i];
+		}
+
+		private static Vector4 Sample(Color[] s, int w, int h, float fx, float fy)
+		{
+			int x0 = (int)MathF.Floor(fx), y0 = (int)MathF.Floor(fy);
+			float tx = fx - x0, ty = fy - y0;
+			int x1 = Math.Clamp(x0 + 1, 0, w - 1), y1 = Math.Clamp(y0 + 1, 0, h - 1);
+			x0 = Math.Clamp(x0, 0, w - 1);
+			y0 = Math.Clamp(y0, 0, h - 1);
+			Vector4 top = Vector4.Lerp(s[y0 * w + x0].ToVector4(), s[y0 * w + x1].ToVector4(), tx);
+			Vector4 bottom = Vector4.Lerp(s[y1 * w + x0].ToVector4(), s[y1 * w + x1].ToVector4(), tx);
+			return Vector4.Lerp(top, bottom, ty);
+		}
+
+		private static Texture2D BuildShapeTexture(GraphicsDevice device, Btn b)
+		{
+			int i = (int)b;
+			int tw = Math.Clamp((int)Math.Round(BtnW(b)), 8, 1024);
+			int th = Math.Clamp((int)Math.Round(BtnH(b)), 8, 1024);
+			Color[]? src = null;
+			int sw = 0, sh = 0;
+			if (btnIcon[i] != null)
+			{
+				try
+				{
+					using FileStream fs = File.OpenRead(Path.Combine(iconDir, btnIcon[i]!));
+					using Texture2D t = Texture2D.FromStream(device, fs);
+					sw = t.Width;
+					sh = t.Height;
+					src = new Color[sw * sh];
+					t.GetData(src);
+				}
+				catch (Exception)
+				{
+					src = null;
+					btnIcon[i] = null;
+				}
+			}
+
+			int rgb = SpriteOf(b).GlowRgb;
+			Color fillColor = btnColor[i] ?? new Color((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255);
+			Vector4 fill = fillColor.ToVector4();
+			Vector4 border = src != null ? Vector4.One : Vector4.Lerp(fill, Vector4.One, 0.65f);
+
+			Color[] data = new Color[tw * th];
+			float hw = tw / 2f, hh = th / 2f;
+			float minHalf = Math.Min(hw, hh);
+			float bw = Math.Max(2f, Math.Min(tw, th) * 0.045f);
+			float rad = Math.Min(tw, th) * 0.2f;
+			int shape = btnShape[i];
+			float cu0 = 0f, cv0 = 0f, cuS = 1f, cvS = 1f;
+			if (src != null)
+			{
+				float sa = sw / (float)sh, ta = tw / (float)th;
+				if (sa > ta)
+				{
+					cuS = ta / sa;
+					cu0 = (1f - cuS) / 2f;
+				}
+				else
+				{
+					cvS = sa / ta;
+					cv0 = (1f - cvS) / 2f;
+				}
+			}
+
+			for (int y = 0; y < th; y++)
+			{
+				for (int x = 0; x < tw; x++)
+				{
+					float px = x + 0.5f - hw, py = y + 0.5f - hh;
+					float d;
+					if (shape == 0)
+					{
+						float r = MathF.Sqrt((px / hw) * (px / hw) + (py / hh) * (py / hh));
+						d = (1f - r) * minHalf;
+					}
+					else
+					{
+						float qx = MathF.Abs(px) - (hw - rad), qy = MathF.Abs(py) - (hh - rad);
+						float ox = MathF.Max(qx, 0f), oy = MathF.Max(qy, 0f);
+						d = -(MathF.Sqrt(ox * ox + oy * oy) + MathF.Min(MathF.Max(qx, qy), 0f) - rad);
+					}
+					float edge = Math.Clamp(d, 0f, 1f);
+					if (edge <= 0f)
+						continue;
+					Vector4 col = fill;
+					if (src != null)
+						col = Sample(src, sw, sh, (cu0 + (x + 0.5f) / tw * cuS) * sw - 0.5f, (cv0 + (y + 0.5f) / th * cvS) * sh - 0.5f);
+					col = Vector4.Lerp(col, border, Math.Clamp(bw - d + 0.5f, 0f, 1f));
+					float a = col.W * edge;
+					data[y * tw + x] = new Color(col.X * a, col.Y * a, col.Z * a, a);
+				}
+			}
+
+			Texture2D tex = new(device, tw, th);
+			tex.SetData(data);
+			return tex;
 		}
 
 		private static void DrawCircle(Texture2D tex, Vector2 center, float radius, Color color)

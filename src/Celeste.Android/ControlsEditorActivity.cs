@@ -31,8 +31,17 @@ namespace CelesteAndroid
 		private static readonly Color Accent = Color.ParseColor("#F2B8D8");
 
 		private ControlsCanvas canvas = null!;
-		private TextView label = null!;
-		private SeekBar seek = null!;
+		private TextView title = null!;
+		private readonly List<Button> tabButtons = new();
+		private readonly List<View> sections = new();
+		private TextView widthLabel = null!, heightLabel = null!;
+		private SeekBar widthSeek = null!, heightSeek = null!;
+		private LinearLayout heightRow = null!;
+		private readonly Button[] shapeButtons = new Button[3];
+		private LinearLayout shapeBox = null!, iconBox = null!;
+		private TextView shapeNote = null!, iconNote = null!;
+		private Button defaultIconButton = null!;
+		private int pickTarget = -1;
 
 		public override ScreenOrientation RequestedOrientation
 		{
@@ -66,6 +75,13 @@ namespace CelesteAndroid
 			HideSystemBars();
 		}
 
+		protected override void OnDestroy()
+		{
+			base.OnDestroy();
+			if (IsFinishing)
+				TouchIcons.Cleanup(GameInstaller.TouchLayoutFile(this));
+		}
+
 		private View BuildLayout()
 		{
 			var root = new FrameLayout(this);
@@ -89,41 +105,16 @@ namespace CelesteAndroid
 			root.AddView(canvas, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
 			var bar = new LinearLayout(this) { Orientation = Orientation.Vertical };
-			bar.SetPadding(Dp(14), Dp(8), Dp(14), Dp(10));
+			bar.SetPadding(Dp(12), Dp(8), Dp(12), Dp(10));
 			var barShape = new GradientDrawable();
 			barShape.SetColor(Color.Argb(215, 18, 12, 34));
 			barShape.SetCornerRadius(Dp(16));
 			bar.Background = barShape;
 
-			var hint = Text(L.EditorHint, 12, Color.Argb(200, 255, 255, 255), false);
-			hint.Gravity = GravityFlags.Center;
-			bar.AddView(hint, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
-
-			var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-			row.SetGravity(GravityFlags.CenterVertical);
-
-			label = Text("", 13, Color.White, true);
-			row.AddView(label, new LinearLayout.LayoutParams(Dp(112), ViewGroup.LayoutParams.WrapContent));
-
-			seek = new SeekBar(this) { Max = 150 };
-			seek.ProgressTintList = Android.Content.Res.ColorStateList.ValueOf(Accent);
-			seek.ThumbTintList = Android.Content.Res.ColorStateList.ValueOf(Accent);
-			seek.ProgressChanged += (_, e) =>
-			{
-				if (!e.FromUser)
-					return;
-				canvas.SetSelectedScale(0.5f + e.Progress / 100f);
-				UpdateLabel();
-			};
-			row.AddView(seek, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
-
-			var reset = MakeButton(L.Reset, filled: false);
-			reset.Click += (_, _) =>
-			{
-				canvas.ResetToDefaults();
-				canvas.OpacityPercent = GameOptions.DefaultOpacity;
-				UpdateBar();
-			};
+			var header = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+			header.SetGravity(GravityFlags.CenterVertical);
+			title = Text("", 14, Color.White, true);
+			header.AddView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
 			var cancel = MakeButton(L.Cancel, filled: false);
 			cancel.Click += (_, _) => Finish();
 			var save = MakeButton(L.Save, filled: true);
@@ -134,26 +125,164 @@ namespace CelesteAndroid
 				Toast.MakeText(this, L.ControlsSaved, ToastLength.Short)?.Show();
 				Finish();
 			};
-			row.AddView(reset, new LinearLayout.LayoutParams(Dp(74), Dp(36)) { LeftMargin = Dp(8) });
-			row.AddView(cancel, new LinearLayout.LayoutParams(Dp(78), Dp(36)) { LeftMargin = Dp(6) });
-			row.AddView(save, new LinearLayout.LayoutParams(Dp(70), Dp(36)) { LeftMargin = Dp(6) });
-			bar.AddView(row, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(4) });
+			header.AddView(cancel, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, Dp(34)) { LeftMargin = Dp(6) });
+			header.AddView(save, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, Dp(34)) { LeftMargin = Dp(6) });
+			bar.AddView(header, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+			var tabRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+			string[] tabNames = { L.TabSize, L.TabShape, L.TabIcon, L.TabMore };
+			for (int k = 0; k < tabNames.Length; k++)
+			{
+				int tab = k;
+				Button tb = MakeButton(tabNames[k], filled: false);
+				tb.Click += (_, _) => ShowTab(tab);
+				tabButtons.Add(tb);
+				tabRow.AddView(tb, new LinearLayout.LayoutParams(0, Dp(34), 1f) { LeftMargin = k == 0 ? 0 : Dp(6) });
+			}
+			bar.AddView(tabRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(8) });
+
+			sections.Add(BuildSizeSection());
+			sections.Add(BuildShapeSection());
+			sections.Add(BuildIconSection());
+			sections.Add(BuildMoreSection());
+			var holder = new FrameLayout(this);
+			foreach (View section in sections)
+				holder.AddView(section, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+			var scroll = new MaxHeightScrollView(this)
+			{
+				MaxHeightPx = Math.Min(Dp(190), (int)(Resources!.DisplayMetrics!.HeightPixels * 0.42f)),
+				VerticalScrollBarEnabled = false,
+			};
+			scroll.AddView(holder, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+			bar.AddView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(8) });
+
+			ShowTab(0);
+
+			int barWidth = Math.Min(Dp(560), Resources!.DisplayMetrics!.WidthPixels - Dp(190));
+			root.AddView(bar, new FrameLayout.LayoutParams(barWidth, ViewGroup.LayoutParams.WrapContent, GravityFlags.Top | GravityFlags.CenterHorizontal) { TopMargin = Dp(8) });
+
+			return root;
+		}
+
+		private void ShowTab(int tab)
+		{
+			for (int i = 0; i < sections.Count; i++)
+				sections[i].Visibility = i == tab ? ViewStates.Visible : ViewStates.Gone;
+			for (int i = 0; i < tabButtons.Count; i++)
+				StyleButton(tabButtons[i], i == tab);
+		}
+
+		private SeekBar MakeSeek(int max, Action<int> onChange)
+		{
+			var s = new SeekBar(this) { Max = max };
+			s.ProgressTintList = Android.Content.Res.ColorStateList.ValueOf(Accent);
+			s.ThumbTintList = Android.Content.Res.ColorStateList.ValueOf(Accent);
+			s.ProgressChanged += (_, e) =>
+			{
+				if (e.FromUser)
+					onChange(e.Progress);
+			};
+			return s;
+		}
+
+		private LinearLayout SeekRow(out TextView lbl, out SeekBar seekBar, int max, Action<int> onChange)
+		{
+			var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+			row.SetGravity(GravityFlags.CenterVertical);
+			lbl = Text("", 12, Color.White, true);
+			row.AddView(lbl, new LinearLayout.LayoutParams(Dp(110), ViewGroup.LayoutParams.WrapContent));
+			seekBar = MakeSeek(max, onChange);
+			row.AddView(seekBar, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+			return row;
+		}
+
+		private View BuildSizeSection()
+		{
+			var box = new LinearLayout(this) { Orientation = Orientation.Vertical };
+			LinearLayout widthRow = SeekRow(out widthLabel, out widthSeek, 150, p =>
+			{
+				canvas.SetSelectedScale(0.5f + p / 100f);
+				UpdateBar();
+			});
+			heightRow = SeekRow(out heightLabel, out heightSeek, 150, p =>
+			{
+				canvas.SetSelectedScaleH(0.5f + p / 100f);
+				UpdateBar();
+			});
+			box.AddView(widthRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+			box.AddView(heightRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+			return box;
+		}
+
+		private View BuildShapeSection()
+		{
+			var box = new LinearLayout(this) { Orientation = Orientation.Vertical };
+			shapeBox = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+			string[] names = { L.ShapeCircle, L.ShapeSquare, L.ShapeRect };
+			for (int k = 0; k < names.Length; k++)
+			{
+				int shape = k;
+				Button b = MakeButton(names[k], filled: false);
+				b.Click += (_, _) =>
+				{
+					canvas.SetSelectedShape(shape);
+					UpdateBar();
+				};
+				shapeButtons[k] = b;
+				shapeBox.AddView(b, new LinearLayout.LayoutParams(0, Dp(36), 1f) { LeftMargin = k == 0 ? 0 : Dp(6) });
+			}
+			shapeNote = Text(L.ShapeUnavailable, 12, Color.Argb(200, 255, 255, 255), false);
+			box.AddView(shapeBox, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+			box.AddView(shapeNote, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+			return box;
+		}
+
+		private View BuildIconSection()
+		{
+			var box = new LinearLayout(this) { Orientation = Orientation.Vertical };
+			iconBox = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+			Button pick = MakeButton(L.PickFromGallery, filled: true);
+			pick.Click += (_, _) =>
+			{
+				if (!canvas.ShapeSupported)
+					return;
+				pickTarget = canvas.Selected;
+				var intent = new Intent(Intent.ActionOpenDocument);
+				intent.AddCategory(Intent.CategoryOpenable);
+				intent.SetType("image/*");
+				StartActivityForResult(intent, RequestPickIcon);
+			};
+			defaultIconButton = MakeButton(L.DefaultIcon, filled: false);
+			defaultIconButton.Click += (_, _) =>
+			{
+				canvas.ClearIcon(canvas.Selected);
+				UpdateBar();
+			};
+			iconBox.AddView(pick, new LinearLayout.LayoutParams(0, Dp(36), 2f));
+			iconBox.AddView(defaultIconButton, new LinearLayout.LayoutParams(0, Dp(36), 1f) { LeftMargin = Dp(6) });
+			iconNote = Text(L.ShapeUnavailable, 12, Color.Argb(200, 255, 255, 255), false);
+			box.AddView(iconBox, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+			box.AddView(iconNote, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+			return box;
+		}
+
+		private View BuildMoreSection()
+		{
+			var box = new LinearLayout(this) { Orientation = Orientation.Vertical };
 
 			var opacityRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
 			opacityRow.SetGravity(GravityFlags.CenterVertical);
-			opacityLabel = Text("", 13, Color.White, true);
-			opacityRow.AddView(opacityLabel, new LinearLayout.LayoutParams(Dp(112), ViewGroup.LayoutParams.WrapContent));
-			opacitySeek = new SeekBar(this) { Max = 100 };
-			opacitySeek.ProgressTintList = Android.Content.Res.ColorStateList.ValueOf(Accent);
-			opacitySeek.ThumbTintList = Android.Content.Res.ColorStateList.ValueOf(Accent);
-			opacitySeek.ProgressChanged += (_, e) =>
+			opacityLabel = Text("", 12, Color.White, true);
+			opacityRow.AddView(opacityLabel, new LinearLayout.LayoutParams(Dp(110), ViewGroup.LayoutParams.WrapContent));
+			opacitySeek = MakeSeek(100, p =>
 			{
-				if (!e.FromUser)
-					return;
-				canvas.OpacityPercent = e.Progress;
+				canvas.OpacityPercent = p;
 				UpdateLabel();
-			};
+			});
 			opacityRow.AddView(opacitySeek, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+			box.AddView(opacityRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+			var gridRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
 			gridButton = MakeButton(L.GridLabel(gridMode), filled: false);
 			gridButton.Click += (_, _) =>
 			{
@@ -162,50 +291,59 @@ namespace CelesteAndroid
 				gridButton.Text = L.GridLabel(gridMode);
 				GameOptions.Prefs(this).Edit()!.PutInt(PrefGrid, gridMode)!.Apply();
 			};
-			opacityRow.AddView(gridButton, new LinearLayout.LayoutParams(Dp(74 + 6 + 78 + 6 + 70), Dp(36)) { LeftMargin = Dp(8) });
-			bar.AddView(opacityRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+			var reset = MakeButton(L.Reset, filled: false);
+			reset.Click += (_, _) =>
+			{
+				canvas.ResetToDefaults();
+				canvas.OpacityPercent = GameOptions.DefaultOpacity;
+				UpdateBar();
+			};
+			gridRow.AddView(gridButton, new LinearLayout.LayoutParams(0, Dp(34), 1f));
+			gridRow.AddView(reset, new LinearLayout.LayoutParams(0, Dp(34), 1f) { LeftMargin = Dp(6) });
+			box.AddView(gridRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(4) });
 
 			var shareRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-			shareRow.SetGravity(GravityFlags.CenterVertical | GravityFlags.End);
 			var exportBtn = MakeButton(L.ExportControls, filled: false);
 			exportBtn.Click += (_, _) => StartExport();
 			var importBtn = MakeButton(L.ImportControls, filled: false);
 			importBtn.Click += (_, _) => StartImport();
-			shareRow.AddView(exportBtn, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, Dp(34)));
-			shareRow.AddView(importBtn, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, Dp(34)) { LeftMargin = Dp(8) });
-			bar.AddView(shareRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(4) });
+			shareRow.AddView(exportBtn, new LinearLayout.LayoutParams(0, Dp(34), 1f));
+			shareRow.AddView(importBtn, new LinearLayout.LayoutParams(0, Dp(34), 1f) { LeftMargin = Dp(6) });
+			box.AddView(shareRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(4) });
 
-			fpsRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-			fpsRow.SetGravity(GravityFlags.CenterVertical);
+			fpsRow = new LinearLayout(this) { Orientation = Orientation.Vertical };
 			fpsCornerButton = MakeButton("", filled: false);
 			fpsCornerButton.Click += (_, _) =>
 			{
 				canvas.SelectItem(ControlsCanvas.Fps);
 				canvas.FpsCorner = (canvas.FpsCorner + 1) % 4;
 			};
-			fpsRow.AddView(fpsCornerButton, new LinearLayout.LayoutParams(Dp(132), Dp(34)));
+			fpsRow.AddView(fpsCornerButton, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Dp(34)));
+			var xRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+			xRow.SetGravity(GravityFlags.CenterVertical);
 			fpsXLabel = Text("", 12, Color.White, true);
-			fpsXLabel.Gravity = GravityFlags.Right | GravityFlags.CenterVertical;
-			fpsRow.AddView(fpsXLabel, new LinearLayout.LayoutParams(Dp(58), ViewGroup.LayoutParams.WrapContent) { LeftMargin = Dp(6) });
+			xRow.AddView(fpsXLabel, new LinearLayout.LayoutParams(Dp(110), ViewGroup.LayoutParams.WrapContent));
 			fpsXSeek = MakeFpsSeek(x: true);
-			fpsRow.AddView(fpsXSeek, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+			xRow.AddView(fpsXSeek, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+			fpsRow.AddView(xRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+			var yRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+			yRow.SetGravity(GravityFlags.CenterVertical);
 			fpsYLabel = Text("", 12, Color.White, true);
-			fpsYLabel.Gravity = GravityFlags.Right | GravityFlags.CenterVertical;
-			fpsRow.AddView(fpsYLabel, new LinearLayout.LayoutParams(Dp(58), ViewGroup.LayoutParams.WrapContent));
+			yRow.AddView(fpsYLabel, new LinearLayout.LayoutParams(Dp(110), ViewGroup.LayoutParams.WrapContent));
 			fpsYSeek = MakeFpsSeek(x: false);
-			fpsRow.AddView(fpsYSeek, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+			yRow.AddView(fpsYSeek, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+			fpsRow.AddView(yRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
 			fpsRow.Visibility = canvas.FpsEnabled ? ViewStates.Visible : ViewStates.Gone;
-			bar.AddView(fpsRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(2) });
+			box.AddView(fpsRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(4) });
 
-			int barWidth = Math.Min(Dp(620), Resources!.DisplayMetrics!.WidthPixels - Dp(190));
-			root.AddView(bar, new FrameLayout.LayoutParams(barWidth, ViewGroup.LayoutParams.WrapContent, GravityFlags.Top | GravityFlags.CenterHorizontal) { TopMargin = Dp(8) });
-
-			return root;
+			var hint = Text(L.EditorHint, 11, Color.Argb(180, 255, 255, 255), false);
+			box.AddView(hint, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(6) });
+			return box;
 		}
 
 		#region Exportar / importar HUD
 
-		private const int RequestExport = 11, RequestImport = 12;
+		private const int RequestExport = 11, RequestImport = 12, RequestPickIcon = 13;
 		private const string HudHeader = "CELESTE_HUD_V1";
 
 		private void StartExport()
@@ -233,6 +371,13 @@ namespace CelesteAndroid
 				return;
 			try
 			{
+				if (requestCode == RequestPickIcon)
+				{
+					if (!ApplyIcon(uri))
+						Toast.MakeText(this, L.IconError, ToastLength.Long)?.Show();
+					UpdateBar();
+					return;
+				}
 				if (requestCode == RequestExport)
 				{
 					ExportTo(uri);
@@ -253,6 +398,90 @@ namespace CelesteAndroid
 			{
 				Toast.MakeText(this, L.ImportInvalid, ToastLength.Long)?.Show();
 			}
+		}
+
+		private bool ApplyIcon(Android.Net.Uri uri)
+		{
+			int target = pickTarget;
+			if (target < ControlsCanvas.Jump || target > ControlsCanvas.Tab)
+				return false;
+			Bitmap? bmp = DecodeIcon(uri, 512);
+			if (bmp == null)
+				return false;
+			try
+			{
+				string dir = TouchIcons.Dir(GameInstaller.TouchLayoutFile(this));
+				Directory.CreateDirectory(dir);
+				string name = ControlsCanvas.KeyOf(target) + "_" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture) + ".png";
+				using (FileStream fs = File.Create(Path.Combine(dir, name)))
+					bmp.Compress(Bitmap.CompressFormat.Png!, 100, fs);
+				return canvas.SetIcon(target, name);
+			}
+			catch (Exception)
+			{
+				return false;
+			}
+			finally
+			{
+				bmp.Recycle();
+			}
+		}
+
+		private Bitmap? DecodeIcon(Android.Net.Uri uri, int maxSide)
+		{
+			var bounds = new BitmapFactory.Options { InJustDecodeBounds = true };
+			using (Stream? s = ContentResolver!.OpenInputStream(uri))
+			{
+				if (s == null)
+					return null;
+				BitmapFactory.DecodeStream(s, null, bounds);
+			}
+			if (bounds.OutWidth <= 0 || bounds.OutHeight <= 0)
+				return null;
+			int sample = 1;
+			while (Math.Max(bounds.OutWidth, bounds.OutHeight) / sample > maxSide * 2)
+				sample *= 2;
+			var opts = new BitmapFactory.Options { InSampleSize = sample };
+			Bitmap? bmp;
+			using (Stream? s = ContentResolver!.OpenInputStream(uri))
+			{
+				if (s == null)
+					return null;
+				bmp = BitmapFactory.DecodeStream(s, null, opts);
+			}
+			if (bmp == null)
+				return null;
+
+			int degrees = 0;
+			try
+			{
+				using Stream? es = ContentResolver!.OpenInputStream(uri);
+				if (es != null)
+				{
+					var exif = new Android.Media.ExifInterface(es);
+					degrees = exif.GetAttributeInt(Android.Media.ExifInterface.TagOrientation, 1) switch { 6 => 90, 3 => 180, 8 => 270, _ => 0 };
+				}
+			}
+			catch (Exception)
+			{
+			}
+
+			float factor = Math.Min(1f, maxSide / (float)Math.Max(bmp.Width, bmp.Height));
+			if (degrees != 0 || factor < 1f)
+			{
+				var m = new Matrix();
+				if (degrees != 0)
+					m.PostRotate(degrees);
+				if (factor < 1f)
+					m.PostScale(factor, factor);
+				Bitmap? scaled = Bitmap.CreateBitmap(bmp, 0, 0, bmp.Width, bmp.Height, m, true);
+				if (scaled != null && scaled != bmp)
+				{
+					bmp.Recycle();
+					bmp = scaled;
+				}
+			}
+			return bmp;
 		}
 
 		private static string ReadOrEmpty(string path) => File.Exists(path) ? File.ReadAllText(path) : "";
@@ -358,7 +587,30 @@ namespace CelesteAndroid
 
 		private void UpdateBar()
 		{
-			seek.Progress = (int)Math.Round((canvas.SelectedScale - 0.5f) * 100f);
+			int sel = canvas.Selected;
+			title.Text = sel == ControlsCanvas.Fps ? "FPS" : ControlsCanvas.Names[sel];
+
+			bool shapeOk = canvas.ShapeSupported;
+			bool rect = shapeOk && canvas.SelectedShape == 2;
+			int wPct = (int)Math.Round(canvas.SelectedScale * 100f);
+			int hPct = (int)Math.Round(canvas.SelectedScaleH * 100f);
+			if (widthSeek.Progress != wPct - 50)
+				widthSeek.Progress = wPct - 50;
+			if (heightSeek.Progress != hPct - 50)
+				heightSeek.Progress = hPct - 50;
+			heightRow.Visibility = rect ? ViewStates.Visible : ViewStates.Gone;
+			widthLabel.Text = $"{(rect ? L.WidthLabel : L.SizeLabel)}: {wPct}%";
+			heightLabel.Text = $"{L.HeightLabel}: {hPct}%";
+
+			shapeBox.Visibility = shapeOk ? ViewStates.Visible : ViewStates.Gone;
+			shapeNote.Visibility = shapeOk ? ViewStates.Gone : ViewStates.Visible;
+			iconBox.Visibility = shapeOk ? ViewStates.Visible : ViewStates.Gone;
+			iconNote.Visibility = shapeOk ? ViewStates.Gone : ViewStates.Visible;
+			for (int k = 0; k < shapeButtons.Length; k++)
+				StyleButton(shapeButtons[k], shapeOk && canvas.SelectedShape == k);
+			defaultIconButton.Enabled = canvas.SelectedHasIcon;
+			defaultIconButton.Alpha = canvas.SelectedHasIcon ? 1f : 0.45f;
+
 			opacitySeek.Progress = canvas.OpacityPercent;
 			UpdateLabel();
 			UpdateFpsRow();
@@ -398,8 +650,6 @@ namespace CelesteAndroid
 
 		private void UpdateLabel()
 		{
-			string name = canvas.Selected == ControlsCanvas.Fps ? "FPS" : ControlsCanvas.Names[canvas.Selected];
-			label.Text = $"{name}: {(int)Math.Round(canvas.SelectedScale * 100f)}%";
 			opacityLabel.Text = $"{L.Opacity}: {canvas.OpacityPercent}%";
 		}
 
@@ -422,6 +672,14 @@ namespace CelesteAndroid
 			button.SetMinimumHeight(0);
 			button.SetMinWidth(0);
 			button.SetMinimumWidth(0);
+			button.SetMaxLines(1);
+			button.Ellipsize = Android.Text.TextUtils.TruncateAt.End;
+			StyleButton(button, filled);
+			return button;
+		}
+
+		private void StyleButton(Button button, bool filled)
+		{
 			var shape = new GradientDrawable();
 			shape.SetCornerRadius(Dp(18));
 			if (filled)
@@ -436,7 +694,6 @@ namespace CelesteAndroid
 				button.SetTextColor(Color.White);
 			}
 			button.Background = new RippleDrawable(Android.Content.Res.ColorStateList.ValueOf(Color.Argb(60, 242, 184, 216)), shape, null);
-			return button;
 		}
 
 		private int Dp(float dp) => (int)TypedValue.ApplyDimension(ComplexUnitType.Dip, dp, Resources!.DisplayMetrics);
@@ -453,6 +710,73 @@ namespace CelesteAndroid
 				insets.Hide(WindowInsets.Type.SystemBars());
 				insets.SystemBarsBehavior = (int)WindowInsetsControllerBehavior.ShowTransientBarsBySwipe;
 			}
+		}
+	}
+
+	internal static class TouchIcons
+	{
+		public static string Dir(string layoutPath) => Path.Combine(Path.GetDirectoryName(layoutPath) ?? "", "touch_icons");
+
+		public static bool ValidName(string n)
+		{
+			if (n.Length < 5 || n.Length > 48 || !n.EndsWith(".png", StringComparison.Ordinal))
+				return false;
+			for (int i = 0; i < n.Length - 4; i++)
+				if (!char.IsLetterOrDigit(n[i]) && n[i] != '_')
+					return false;
+			return true;
+		}
+
+		// Apaga imagens que não estão mais no layout salvo (cancelamentos, ícones trocados ou removidos).
+		public static void Cleanup(string layoutPath)
+		{
+			try
+			{
+				string dir = Dir(layoutPath);
+				if (!Directory.Exists(dir))
+					return;
+				var keep = new HashSet<string>(StringComparer.Ordinal);
+				if (File.Exists(layoutPath))
+				{
+					foreach (string line in File.ReadAllLines(layoutPath))
+					{
+						string[] kv = line.Split('=');
+						if (kv.Length != 2 || !kv[0].Trim().StartsWith("shape_", StringComparison.Ordinal))
+							continue;
+						string[] v = kv[1].Split(',');
+						if (v.Length == 3)
+							keep.Add(v[2].Trim());
+					}
+				}
+				foreach (string file in Directory.GetFiles(dir))
+				{
+					if (!keep.Contains(Path.GetFileName(file)))
+						File.Delete(file);
+				}
+				if (Directory.GetFiles(dir).Length == 0)
+					Directory.Delete(dir);
+			}
+			catch (Exception)
+			{
+			}
+		}
+	}
+
+	internal sealed class MaxHeightScrollView : ScrollView
+	{
+		public int MaxHeightPx { get; set; } = int.MaxValue;
+
+		public MaxHeightScrollView(Context context) : base(context)
+		{
+		}
+
+		protected MaxHeightScrollView(IntPtr handle, JniHandleOwnership transfer) : base(handle, transfer)
+		{
+		}
+
+		protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)
+		{
+			base.OnMeasure(widthMeasureSpec, MeasureSpec.MakeMeasureSpec(MaxHeightPx, MeasureSpecMode.AtMost));
 		}
 	}
 
@@ -477,6 +801,17 @@ namespace CelesteAndroid
 		private readonly float[] fx = new float[Count];
 		private readonly float[] fy = new float[Count];
 		private readonly float[] scale = new float[Count + 1];
+		private readonly int[] shape = new int[Count];
+		private readonly float[] hscale = new float[Count];
+		private readonly string?[] icon = new string?[Count];
+		private readonly Bitmap?[] iconBmp = new Bitmap?[Count];
+
+		public static string KeyOf(int i) => Keys[i];
+
+		public bool ShapeSupported => Selected >= Jump && Selected <= Tab;
+		public int SelectedShape => ShapeSupported ? shape[Selected] : 0;
+		public float SelectedScaleH => ShapeSupported && shape[Selected] == 2 ? hscale[Selected] : scale[Selected];
+		public bool SelectedHasIcon => ShapeSupported && icon[Selected] != null;
 		private readonly Paint paint = new(PaintFlags.AntiAlias);
 		private bool ready;
 		private bool isDefault = true;
@@ -550,6 +885,8 @@ namespace CelesteAndroid
 			this.path = path;
 			for (int i = 0; i <= Count; i++)
 				scale[i] = 1f;
+			for (int i = 0; i < Count; i++)
+				hscale[i] = 1f;
 		}
 
 		protected ControlsCanvas(IntPtr handle, JniHandleOwnership transfer) : base(handle, transfer)
@@ -563,6 +900,20 @@ namespace CelesteAndroid
 		private float BtnRadius(int i) => (i == Pause ? 0.32f : i == Tab ? 0.4f : 0.5f) * Unit * scale[i];
 		private float StickRange => Height * StickRadius * scale[Stick];
 		private float VisibleRadius(int i) => i == Stick ? StickRange * 1.1f : BtnRadius(i);
+		private float BtnW(int i) => BtnRadius(i) * 2f;
+		private float BtnH(int i) => (i == Pause ? 0.32f : i == Tab ? 0.4f : 0.5f) * Unit * 2f * (shape[i] == 2 ? hscale[i] : scale[i]);
+		private float HalfW(int i) => i == Stick ? StickRange * 1.1f : BtnW(i) / 2f;
+		private float HalfH(int i) => i == Stick ? StickRange * 1.1f : BtnH(i) / 2f;
+		private bool Skinned(int i) => i >= Jump && i <= Tab && (shape[i] != 0 || iconBmp[i] != null);
+
+		private float HitScore(int i, float x, float y)
+		{
+			float dx = x - fx[i] * Width, dy = y - fy[i] * Height;
+			if (i == Stick)
+				return MathF.Sqrt(dx * dx + dy * dy) / HitRadius(i);
+			float nx = dx / (HalfW(i) * 1.25f), ny = dy / (HalfH(i) * 1.25f);
+			return shape[i] != 0 ? Math.Max(Math.Abs(nx), Math.Abs(ny)) : MathF.Sqrt(nx * nx + ny * ny);
+		}
 		private float FpsCell => Math.Max(2f, Height * 0.0045f) * scale[Fps];
 		private float FpsW => (6 * 6f - 1f) * FpsCell;
 		private float FpsH => 7f * FpsCell;
@@ -620,6 +971,14 @@ namespace CelesteAndroid
 			Place(Tab, w - 1.75f * u, 0.8f * u);
 			for (int i = 0; i <= Count; i++)
 				scale[i] = 1f;
+			for (int i = 0; i < Count; i++)
+			{
+				shape[i] = 0;
+				hscale[i] = 1f;
+				icon[i] = null;
+				iconBmp[i]?.Recycle();
+				iconBmp[i] = null;
+			}
 			fpsCorner = 0;
 			fpsMx = Math.Max(2f, h * 0.0045f) * 3f / w;
 			fpsMy = Math.Max(2f, h * 0.0045f) * 3f / h;
@@ -666,6 +1025,12 @@ namespace CelesteAndroid
 						}
 						continue;
 					}
+					string lineKey = kv[0].Trim();
+					if (lineKey.StartsWith("shape_", StringComparison.Ordinal))
+					{
+						LoadShapeLine(lineKey.Substring(6), kv[1]);
+						continue;
+					}
 					int idx = Array.IndexOf(Keys, kv[0].Trim());
 					string[] v = kv[1].Split(',');
 					if (idx < 0 || v.Length != 3)
@@ -698,6 +1063,12 @@ namespace CelesteAndroid
 				var sb = new StringBuilder();
 				for (int i = 0; i < Count; i++)
 					sb.Append(string.Format(CultureInfo.InvariantCulture, "{0}={1:0.0000},{2:0.0000},{3:0.00}\n", Keys[i], fx[i], fy[i], scale[i]));
+				for (int i = Jump; i <= Tab; i++)
+				{
+					if (shape[i] == 0 && icon[i] == null)
+						continue;
+					sb.Append(string.Format(CultureInfo.InvariantCulture, "shape_{0}={1},{2:0.00},{3}\n", Keys[i], shape[i], shape[i] == 2 ? hscale[i] : scale[i], icon[i] ?? "-"));
+				}
 				sb.Append(string.Format(CultureInfo.InvariantCulture, "fps={0},{1:0.0000},{2:0.0000},{3:0.00}\n", fpsCorner, fpsMx, fpsMy, scale[Fps]));
 				File.WriteAllText(path, sb.ToString());
 			}
@@ -706,9 +1077,100 @@ namespace CelesteAndroid
 			}
 		}
 
+		private void LoadShapeLine(string key, string value)
+		{
+			int idx = Array.IndexOf(Keys, key);
+			string[] v = value.Split(',');
+			if (idx < Jump || idx > Tab || v.Length != 3)
+				return;
+			if (!int.TryParse(v[0].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int sh)
+				|| !float.TryParse(v[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float hs))
+				return;
+			shape[idx] = Math.Clamp(sh, 0, 2);
+			hscale[idx] = Math.Clamp(hs, 0.5f, 2f);
+			string name = v[2].Trim();
+			if (name != "-")
+			{
+				Bitmap? bmp = TryLoadIcon(name);
+				if (bmp != null)
+				{
+					iconBmp[idx]?.Recycle();
+					iconBmp[idx] = bmp;
+					icon[idx] = name;
+				}
+			}
+			isDefault = false;
+		}
+
+		private Bitmap? TryLoadIcon(string name)
+		{
+			if (!TouchIcons.ValidName(name))
+				return null;
+			try
+			{
+				string file = Path.Combine(TouchIcons.Dir(path), name);
+				return File.Exists(file) ? BitmapFactory.DecodeFile(file) : null;
+			}
+			catch (Exception)
+			{
+				return null;
+			}
+		}
+
+		public void SetSelectedShape(int s)
+		{
+			if (!ShapeSupported)
+				return;
+			int old = shape[Selected];
+			shape[Selected] = Math.Clamp(s, 0, 2);
+			if (shape[Selected] == 2 && old != 2)
+				hscale[Selected] = scale[Selected];
+			isDefault = false;
+			ClampSelected();
+			Invalidate();
+		}
+
+		public void SetSelectedScaleH(float s)
+		{
+			if (!ShapeSupported || shape[Selected] != 2)
+				return;
+			hscale[Selected] = Math.Clamp(s, 0.5f, 2f);
+			isDefault = false;
+			ClampSelected();
+			Invalidate();
+		}
+
+		public bool SetIcon(int i, string name)
+		{
+			if (i < Jump || i > Tab)
+				return false;
+			Bitmap? bmp = TryLoadIcon(name);
+			if (bmp == null)
+				return false;
+			iconBmp[i]?.Recycle();
+			iconBmp[i] = bmp;
+			icon[i] = name;
+			isDefault = false;
+			Invalidate();
+			return true;
+		}
+
+		public void ClearIcon(int i)
+		{
+			if (i < Jump || i > Tab)
+				return;
+			iconBmp[i]?.Recycle();
+			iconBmp[i] = null;
+			icon[i] = null;
+			isDefault = false;
+			Invalidate();
+		}
+
 		public void SetSelectedScale(float s)
 		{
 			scale[Selected] = Math.Clamp(s, 0.5f, 2f);
+			if (ShapeSupported && shape[Selected] != 2)
+				hscale[Selected] = scale[Selected];
 			isDefault = false;
 			ClampSelected();
 			Invalidate();
@@ -721,9 +1183,9 @@ namespace CelesteAndroid
 				ClampFps();
 				return;
 			}
-			float m = VisibleRadius(Selected);
-			float px = Math.Clamp(fx[Selected] * Width, m, Math.Max(m, Width - m));
-			float py = Math.Clamp(fy[Selected] * Height, m, Math.Max(m, Height - m));
+			float mx = HalfW(Selected), my = HalfH(Selected);
+			float px = Math.Clamp(fx[Selected] * Width, mx, Math.Max(mx, Width - mx));
+			float py = Math.Clamp(fy[Selected] * Height, my, Math.Max(my, Height - my));
 			fx[Selected] = px / Width;
 			fy[Selected] = py / Height;
 		}
@@ -823,6 +1285,8 @@ namespace CelesteAndroid
 				paint.Color = Color.Argb(A(1.1f), 255, 255, 255);
 				canvas.DrawCircle(cx, cy, range * 0.45f, paint);
 			}
+			else if (Skinned(i))
+				DrawSkinned(canvas, i, cx, cy);
 			else
 			{
 				PixelButtonArt.Sprite sp = Sprites[i]!;
@@ -857,7 +1321,124 @@ namespace CelesteAndroid
 				paint.SetStyle(Paint.Style.Stroke!);
 				paint.StrokeWidth = Dp(3);
 				paint.Color = Color.ParseColor("#F2B8D8");
-				canvas.DrawCircle(cx, cy, VisibleRadius(i) + Dp(6), paint);
+				if (i == Stick || (shape[i] == 0 && !Skinned(i)))
+					canvas.DrawCircle(cx, cy, HalfW(i) + Dp(6), paint);
+				else
+				{
+					float pad = Dp(6);
+					var ring = new RectF(cx - HalfW(i) - pad, cy - HalfH(i) - pad, cx + HalfW(i) + pad, cy + HalfH(i) + pad);
+					if (shape[i] == 0)
+						canvas.DrawOval(ring, paint);
+					else
+					{
+						float rr = Math.Min(HalfW(i), HalfH(i)) * 0.4f + pad;
+						canvas.DrawRoundRect(ring, rr, rr, paint);
+					}
+				}
+			}
+		}
+
+		private static readonly Dictionary<char, string[]> LabelGlyphs = new()
+		{
+			['A'] = new[] { "01110", "10001", "10001", "11111", "10001", "10001", "10001" },
+			['B'] = new[] { "11110", "10001", "10001", "11110", "10001", "10001", "11110" },
+			['G'] = new[] { "01110", "10001", "10000", "10111", "10001", "10001", "01111" },
+			['T'] = new[] { "11111", "00100", "00100", "00100", "00100", "00100", "00100" },
+			['X'] = new[] { "10001", "10001", "01010", "00100", "01010", "10001", "10001" },
+		};
+
+		private void DrawSkinned(Canvas canvas, int i, float cx, float cy)
+		{
+			float w = BtnW(i), h = BtnH(i);
+			var rect = new RectF(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f);
+			float rad = Math.Min(w, h) * 0.2f;
+			float alpha = ButtonAlpha;
+			int a255 = Math.Clamp((int)Math.Round(alpha * 255f), 0, 255);
+			int body = Sprites[i]!.GlowRgb;
+			int cr = (body >> 16) & 255, cg = (body >> 8) & 255, cb = body & 255;
+			bool hasIcon = iconBmp[i] != null;
+
+			using var clip = new Android.Graphics.Path();
+			if (shape[i] == 0)
+				clip.AddOval(rect, Android.Graphics.Path.Direction.Cw!);
+			else
+				clip.AddRoundRect(rect, rad, rad, Android.Graphics.Path.Direction.Cw!);
+
+			canvas.Save();
+			canvas.ClipPath(clip);
+			paint.SetStyle(Paint.Style.Fill!);
+			if (hasIcon)
+			{
+				Bitmap bmp = iconBmp[i]!;
+				float sa = (float)bmp.Width / bmp.Height, ta = w / h;
+				int sw, sh;
+				if (sa > ta)
+				{
+					sh = bmp.Height;
+					sw = (int)Math.Round(sh * ta);
+				}
+				else
+				{
+					sw = bmp.Width;
+					sh = (int)Math.Round(sw / ta);
+				}
+				int sx = (bmp.Width - sw) / 2, sy = (bmp.Height - sh) / 2;
+				paint.FilterBitmap = true;
+				paint.Alpha = a255;
+				canvas.DrawBitmap(bmp, new Rect(sx, sy, sx + sw, sy + sh), rect, paint);
+				paint.Alpha = 255;
+			}
+			else
+			{
+				paint.Color = Color.Argb(a255, cr, cg, cb);
+				canvas.DrawRect(rect, paint);
+			}
+			canvas.Restore();
+
+			paint.SetStyle(Paint.Style.Stroke!);
+			paint.StrokeWidth = Math.Max(Dp(1.5f), Math.Min(w, h) * 0.045f);
+			if (hasIcon)
+				paint.Color = Color.Argb(a255, 255, 255, 255);
+			else
+				paint.Color = Color.Argb(a255, cr + (int)((255 - cr) * 0.65f), cg + (int)((255 - cg) * 0.65f), cb + (int)((255 - cb) * 0.65f));
+			if (shape[i] == 0)
+				canvas.DrawOval(rect, paint);
+			else
+				canvas.DrawRoundRect(rect, rad, rad, paint);
+
+			if (!hasIcon)
+				DrawLabel(canvas, i, cx, cy, w, h, alpha, cr, cg, cb);
+		}
+
+		private void DrawLabel(Canvas canvas, int i, float cx, float cy, float w, float h, float alpha, int cr, int cg, int cb)
+		{
+			float lum = (0.299f * cr + 0.587f * cg + 0.114f * cb) / 255f;
+			int ink = lum > 0.6f ? 0 : 255;
+			int a = Math.Clamp((int)Math.Round(Math.Max(alpha, 0.35f) * 255f), 0, 255);
+			paint.SetStyle(Paint.Style.Fill!);
+			paint.Color = Color.Argb(a, ink, ink, ink);
+			float m = Math.Min(w, h);
+			if (i == Pause)
+			{
+				float bw = Math.Max(2f, m * 0.12f), bh = m * 0.42f, gap = m * 0.14f;
+				canvas.DrawRect(cx - gap / 2f - bw, cy - bh / 2f, cx - gap / 2f, cy + bh / 2f, paint);
+				canvas.DrawRect(cx + gap / 2f, cy - bh / 2f, cx + gap / 2f + bw, cy + bh / 2f, paint);
+				return;
+			}
+			string label = i == Jump ? "A" : i == Dash ? "X" : i == Grab ? "G" : "TAB";
+			float cell = Math.Max(1f, Math.Min(m * 0.5f / 7f, w * 0.7f / (label.Length * 6f - 1f)));
+			float lw = (label.Length * 6f - 1f) * cell, lh = 7f * cell;
+			float x0 = cx - lw / 2f, y0 = cy - lh / 2f;
+			foreach (char ch in label)
+			{
+				if (LabelGlyphs.TryGetValue(ch, out string[]? rows))
+				{
+					for (int yy = 0; yy < rows.Length; yy++)
+						for (int col = 0; col < rows[yy].Length; col++)
+							if (rows[yy][col] == '1')
+								canvas.DrawRect(x0 + col * cell, y0 + yy * cell, x0 + (col + 1) * cell, y0 + (yy + 1) * cell, paint);
+				}
+				x0 += cell * 6f;
 			}
 		}
 
@@ -887,9 +1468,7 @@ namespace CelesteAndroid
 			float bestScore = float.MaxValue;
 			for (int i = 0; i < Count; i++)
 			{
-				float dx = x - fx[i] * Width, dy = y - fy[i] * Height;
-				float reach = HitRadius(i);
-				float score = MathF.Sqrt(dx * dx + dy * dy) / reach;
+				float score = HitScore(i, x, y);
 				if (score <= 1f && score < bestScore)
 				{
 					bestScore = score;

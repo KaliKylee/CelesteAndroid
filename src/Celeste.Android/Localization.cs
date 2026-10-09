@@ -537,6 +537,48 @@ namespace CelesteAndroid
 			"控制设置已保存",
 			"컨트롤이 저장되었습니다");
 
+		public static string TabSize => T(
+			"Tamanho", "Size", "Tamaño", "サイズ", "Taille", "Dimensione", "Größe", "Размер", "大小", "크기");
+
+		public static string TabShape => T(
+			"Forma", "Shape", "Forma", "形", "Forme", "Forma", "Form", "Форма", "形状", "모양");
+
+		public static string TabIcon => T(
+			"Ícone", "Icon", "Icono", "アイコン", "Icône", "Icona", "Symbol", "Значок", "图标", "아이콘");
+
+		public static string TabMore => T(
+			"Mais", "More", "Más", "その他", "Plus", "Altro", "Mehr", "Ещё", "更多", "더보기");
+
+		public static string ShapeCircle => T(
+			"Círculo", "Circle", "Círculo", "円", "Cercle", "Cerchio", "Kreis", "Круг", "圆形", "원");
+
+		public static string ShapeSquare => T(
+			"Quadrado", "Square", "Cuadrado", "正方形", "Carré", "Quadrato", "Quadrat", "Квадрат", "正方形", "정사각형");
+
+		public static string ShapeRect => T(
+			"Retângulo", "Rectangle", "Rectángulo", "長方形", "Rectangle", "Rettangolo", "Rechteck", "Прямоугольник", "矩形", "직사각형");
+
+		public static string SizeLabel => T(
+			"Tamanho", "Size", "Tamaño", "サイズ", "Taille", "Dimensione", "Größe", "Размер", "大小", "크기");
+
+		public static string WidthLabel => T(
+			"Largura", "Width", "Ancho", "幅", "Largeur", "Larghezza", "Breite", "Ширина", "宽度", "너비");
+
+		public static string HeightLabel => T(
+			"Altura", "Height", "Alto", "高さ", "Hauteur", "Altezza", "Höhe", "Высота", "高度", "높이");
+
+		public static string PickFromGallery => T(
+			"Escolher da galeria", "Choose from gallery", "Elegir de la galería", "ギャラリーから選ぶ", "Choisir dans la galerie", "Scegli dalla galleria", "Aus Galerie wählen", "Выбрать из галереи", "从相册选择", "갤러리에서 선택");
+
+		public static string DefaultIcon => T(
+			"Padrão", "Default", "Predeterminado", "標準", "Par défaut", "Predefinito", "Standard", "По умолчанию", "默认", "기본");
+
+		public static string ShapeUnavailable => T(
+			"Este controle é sempre redondo e não aceita ícone.", "This control is always round and can't have an icon.", "Este control siempre es redondo y no admite icono.", "このコントロールは常に円形で、アイコンを設定できません。", "Cette commande est toujours ronde et n'a pas d'icône.", "Questo controllo è sempre rotondo e non supporta icone.", "Dieses Steuerelement ist immer rund und hat kein Symbol.", "Этот элемент всегда круглый, значок для него недоступен.", "此控件始终为圆形，无法设置图标。", "이 컨트롤은 항상 원형이며 아이콘을 설정할 수 없습니다.");
+
+		public static string IconError => T(
+			"Não foi possível usar essa imagem", "Couldn't use that image", "No se pudo usar esa imagen", "この画像は使用できません", "Impossible d'utiliser cette image", "Impossibile usare questa immagine", "Dieses Bild kann nicht verwendet werden", "Не удалось использовать это изображение", "无法使用该图片", "이 이미지를 사용할 수 없습니다");
+
 		public static string[] ControlNames => V(
 			new[] { "Analógico", "Pular", "Dash", "Agarrar", "Pausar", "Tab" },
 			new[] { "Stick", "Jump", "Dash", "Grab", "Pause", "Tab" },

@@ -70,13 +70,22 @@ namespace CelesteAndroid
 		private static readonly Color?[] btnColor = new Color?[5];
 		private static readonly float[] btnOpacity = { -1f, -1f, -1f, -1f, -1f };
 
-		// Forma/ícone personalizados (0 = círculo, 1 = quadrado, 2 = retângulo)
+		// Forma/ícone dos botões padrão (0 = círculo, 1 = quadrado, 2 = retângulo)
 		private static readonly int[] btnShape = new int[5];
 		private static readonly float[] btnHeight = { 1f, 1f, 1f, 1f, 1f };
 		private static readonly string?[] btnIcon = new string?[5];
 		private static string iconDir = "";
-		private static readonly Texture2D?[] shapeTex = new Texture2D?[5];
+
+		private sealed class SkinTex
+		{
+			public Texture2D Tex = null!;
+			public int W, H, Cell;
+		}
+
+		private static readonly SkinTex?[] shapeSkin = new SkinTex?[5];
 		private static readonly bool[] shapeBuilt = new bool[5];
+		private static SkinTex?[] customSkin = new SkinTex?[0];
+		private static bool[] customBuilt = new bool[0];
 
 		private static bool Shaped(Btn b) => btnShape[(int)b] != 0 || btnIcon[(int)b] != null;
 
@@ -112,6 +121,10 @@ namespace CelesteAndroid
 			public float Opacity; // -1 = geral
 			public float X, Y, Scale;
 			public string Label;
+			public int Rgb;
+			public int Shape;
+			public float HScale;
+			public string? Icon;
 		}
 
 		private static readonly List<CustomBtn> customBtns = new();
@@ -141,6 +154,7 @@ namespace CelesteAndroid
 		private static void LoadCustomButtons(string layoutPath)
 		{
 			customBtns.Clear();
+			iconDir = Path.Combine(Path.GetDirectoryName(layoutPath) ?? "", "touch_icons");
 			try
 			{
 				string file = Path.Combine(Path.GetDirectoryName(layoutPath) ?? "", "custom_buttons.txt");
@@ -152,7 +166,7 @@ namespace CelesteAndroid
 					if (kv.Length != 2 || !kv[0].Trim().StartsWith("c"))
 						continue;
 					string[] v = kv[1].Split(',');
-					if (v.Length != 6 || customBtns.Count >= 12)
+					if ((v.Length != 6 && v.Length != 9) || customBtns.Count >= 12)
 						continue;
 					Keys? key = v[0].Trim() != "-" && Enum.TryParse(v[0].Trim(), out Keys k) ? k : null;
 					int rgb = 0x4DA3FF;
@@ -160,6 +174,18 @@ namespace CelesteAndroid
 						int.TryParse(v[1].Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out rgb);
 					float F(string t, float d) => float.TryParse(t.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float r) ? r : d;
 					float op = F(v[2], -1f);
+					float cscale = Math.Clamp(F(v[5], 100f), 40f, 250f) / 100f;
+					int cshape = 0;
+					float chs = cscale;
+					string? cicon = null;
+					if (v.Length == 9)
+					{
+						cshape = Math.Clamp((int)F(v[6], 0f), 0, 2);
+						chs = Math.Clamp(F(v[7], cscale * 100f), 40f, 250f) / 100f;
+						string ic = v[8].Trim();
+						if (ic != "-" && ValidIconName(ic) && File.Exists(Path.Combine(iconDir, ic)))
+							cicon = ic;
+					}
 					customBtns.Add(new CustomBtn
 					{
 						Key = key,
@@ -167,8 +193,12 @@ namespace CelesteAndroid
 						Opacity = op < 0f ? -1f : Math.Clamp(op, 0f, 100f) / 100f,
 						X = Math.Clamp(F(v[3], 50f), 0f, 100f) / 100f,
 						Y = Math.Clamp(F(v[4], 50f), 0f, 100f) / 100f,
-						Scale = Math.Clamp(F(v[5], 100f), 40f, 250f) / 100f,
-						Label = LabelOf(key),
+						Scale = cscale,
+						Label = key.HasValue ? PixelButtonArt.LabelFor(key.Value.ToString()) : "",
+						Rgb = rgb & 0xFFFFFF,
+						Shape = cshape,
+						HScale = chs,
+						Icon = cicon,
 					});
 				}
 			}
@@ -176,9 +206,21 @@ namespace CelesteAndroid
 			{
 			}
 			customPressed = new bool[customBtns.Count];
+			customSkin = new SkinTex?[customBtns.Count];
+			customBuilt = new bool[customBtns.Count];
 		}
 
-		private static float CustomRadius(int i) => 0.5f * BaseUnit * customBtns[i].Scale;
+		private static float CustomW(int i) => BaseUnit * customBtns[i].Scale;
+
+		private static float CustomH(int i) => BaseUnit * (customBtns[i].Shape == 2 ? customBtns[i].HScale : customBtns[i].Scale);
+
+		private static bool HitsCustom(Vector2 p, int i)
+		{
+			Vector2 c = CustomCenter(i);
+			float nx = (p.X - c.X) / (CustomW(i) * 0.5f * 1.15f);
+			float ny = (p.Y - c.Y) / (CustomH(i) * 0.5f * 1.15f);
+			return customBtns[i].Shape != 0 ? Math.Max(Math.Abs(nx), Math.Abs(ny)) <= 1f : nx * nx + ny * ny <= 1f;
+		}
 
 		private static Vector2 CustomCenter(int i) => new Vector2(customBtns[i].X * screenW, customBtns[i].Y * screenH);
 
@@ -186,7 +228,7 @@ namespace CelesteAndroid
 		{
 			for (int i = customBtns.Count - 1; i >= 0; i--)
 			{
-				if (Vector2.Distance(p, CustomCenter(i)) <= CustomRadius(i) * 1.15f)
+				if (HitsCustom(p, i))
 				{
 					which = i;
 					return true;
@@ -552,12 +594,13 @@ namespace CelesteAndroid
 				DrawCircle(disc!, knob, range * 0.45f, Color.White * (a * 1.1f));
 				foreach (Btn b in Enum.GetValues(typeof(Btn)))
 					DrawGlow(b);
-				DrawCustomButtons();
+				DrawCustomGlows();
 				batch.End();
 
 				batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, null, null);
 				foreach (Btn b in Enum.GetValues(typeof(Btn)))
 					DrawButton(b);
+				DrawCustomSkins();
 				batch.End();
 			}
 
@@ -674,7 +717,10 @@ namespace CelesteAndroid
 		private static void DrawGlow(Btn b)
 		{
 			if (Shaped(b))
+			{
+				DrawShapedGlow(b);
 				return;
+			}
 			int rgb = SpriteOf(b).GlowRgb;
 			Color tint = btnColor[(int)b] ?? new Color((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255);
 			Rectangle r = SpriteRect(b);
@@ -694,63 +740,56 @@ namespace CelesteAndroid
 			batch!.Draw(sprites[(int)b]!, SpriteRect(b), (btnColor[(int)b] ?? Color.White) * alpha);
 		}
 
-		private static void DrawCustomButtons()
-		{
-			for (int i = 0; i < customBtns.Count; i++)
-			{
-				CustomBtn c = customBtns[i];
-				bool down = i < customPressed.Length && customPressed[i];
-				float baseA = c.Opacity < 0f ? ButtonOpacity : (c.Opacity <= 0.45f ? c.Opacity / 0.45f * 0.9f : Math.Min(1f, 0.9f + (c.Opacity - 0.45f) / 0.55f * 0.1f));
-				float a = down ? 1f : baseA;
-				Vector2 center = CustomCenter(i);
-				float r = CustomRadius(i) * (down ? 0.94f : 1f);
-				DrawCircle(disc!, center, r, c.Color * a);
-				DrawCircle(ring!, center, r, Color.White * (a * 0.85f));
-				if (c.Label.Length == 0)
-					continue;
-				float cell = Math.Max(1f, Math.Min(r * 2f * 0.62f / (c.Label.Length * 6f - 1f), r * 2f * 0.1f));
-				float w = (c.Label.Length * 6f - 1f) * cell, h = 7f * cell;
-				float lum = (0.299f * c.Color.R + 0.587f * c.Color.G + 0.114f * c.Color.B) / 255f;
-				DrawText(c.Label, new Vector2(center.X - w / 2f, center.Y - h / 2f), cell, (lum > 0.6f ? Color.Black : Color.White) * Math.Max(a, 0.35f));
-			}
-		}
-
 		private static string? ShapeLabel(Btn b) => b switch { Btn.Jump => "A", Btn.Dash => "X", Btn.Grab => "G", Btn.Tab => "TAB", _ => null };
 
-		private static void DrawShaped(Btn b)
+		// Monta a textura pixel art do botão (e, se houver, a foto da galeria dentro da moldura).
+		private static SkinTex BuildSkinTex(GraphicsDevice device, int[] pal, int shape, float w, float h, string? label, bool pause, ref string? iconName)
 		{
-			Texture2D? tex = ShapeTexture(b);
-			if (tex == null)
-				return;
-			int i = (int)b;
-			bool down = pressed[i];
-			float alpha = down ? 1f : OpacityOf(b);
-			Vector2 c = Center(b);
-			float k = down ? 0.94f : 1f;
-			float w = BtnW(b) * k, h = BtnH(b) * k;
-			batch!.Draw(tex, new Rectangle((int)Math.Round(c.X - w / 2f), (int)Math.Round(c.Y - h / 2f), (int)Math.Round(w), (int)Math.Round(h)), Color.White * alpha);
-			if (btnIcon[i] != null)
-				return;
-
-			int rgb = SpriteOf(b).GlowRgb;
-			Color fill = btnColor[i] ?? new Color((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255);
-			float lum = (0.299f * fill.R + 0.587f * fill.G + 0.114f * fill.B) / 255f;
-			Color ink = (lum > 0.6f ? Color.Black : Color.White) * Math.Max(alpha, 0.35f);
-			float m = Math.Min(w, h);
-			if (b == Btn.Pause)
+			PixelButtonArt.Snap(w, h, out int cols, out int rows, out int cell);
+			int[]? photo = null;
+			int pw = 0, ph = 0;
+			if (iconName != null)
 			{
-				float bw = Math.Max(2f, m * 0.12f), bh = m * 0.42f, gap = m * 0.14f;
-				batch.Draw(pixel!, new Rectangle((int)(c.X - gap / 2f - bw), (int)(c.Y - bh / 2f), (int)bw, (int)bh), ink);
-				batch.Draw(pixel!, new Rectangle((int)(c.X + gap / 2f), (int)(c.Y - bh / 2f), (int)bw, (int)bh), ink);
-				return;
+				try
+				{
+					using FileStream fs = File.OpenRead(Path.Combine(iconDir, iconName));
+					using Texture2D src = Texture2D.FromStream(device, fs);
+					pw = src.Width;
+					ph = src.Height;
+					Color[] px = new Color[pw * ph];
+					src.GetData(px);
+					photo = new int[px.Length];
+					for (int k = 0; k < px.Length; k++)
+						photo[k] = (px[k].A << 24) | (px[k].R << 16) | (px[k].G << 8) | px[k].B;
+				}
+				catch (Exception)
+				{
+					photo = null;
+					iconName = null;
+				}
 			}
-			string label = ShapeLabel(b)!;
-			float cell = Math.Max(1f, Math.Min(m * 0.5f / 7f, w * 0.7f / (label.Length * 6f - 1f)));
-			float lw = (label.Length * 6f - 1f) * cell, lh = 7f * cell;
-			DrawText(label, new Vector2(c.X - lw / 2f, c.Y - lh / 2f), cell, ink);
+
+			int[] argb = PixelButtonArt.BuildSkin(pal, shape, cols, rows, label, pause, photo != null, out bool[] interior);
+			int tw = cols, th = rows;
+			if (photo != null)
+			{
+				argb = PixelButtonArt.Compose(cols, rows, cell, argb, interior, photo, pw, ph, pal[2]);
+				tw = cols * cell;
+				th = rows * cell;
+			}
+
+			Color[] data = new Color[tw * th];
+			for (int k = 0; k < data.Length; k++)
+			{
+				int c = argb[k];
+				data[k] = ((c >> 24) & 255) == 0 ? Color.Transparent : new Color((c >> 16) & 255, (c >> 8) & 255, c & 255, 255);
+			}
+			Texture2D tex = new(device, tw, th);
+			tex.SetData(data);
+			return new SkinTex { Tex = tex, W = cols * cell, H = rows * cell, Cell = cell };
 		}
 
-		private static Texture2D? ShapeTexture(Btn b)
+		private static SkinTex? ShapeSkin(Btn b)
 		{
 			int i = (int)b;
 			if (!shapeBuilt[i])
@@ -758,112 +797,95 @@ namespace CelesteAndroid
 				shapeBuilt[i] = true;
 				try
 				{
-					shapeTex[i] = BuildShapeTexture(batch!.GraphicsDevice, b);
+					PixelButtonArt.Sprite sp = SpriteOf(b);
+					Color? tint = btnColor[i];
+					int[] pal = tint.HasValue ? PixelButtonArt.PaletteFrom((tint.Value.R << 16) | (tint.Value.G << 8) | tint.Value.B) : sp.Rgb;
+					shapeSkin[i] = BuildSkinTex(batch!.GraphicsDevice, pal, btnShape[i], BtnW(b), BtnH(b), ShapeLabel(b), b == Btn.Pause, ref btnIcon[i]);
 				}
 				catch (Exception)
 				{
-					shapeTex[i] = null;
+					shapeSkin[i] = null;
 				}
 			}
-			return shapeTex[i];
+			return shapeSkin[i];
 		}
 
-		private static Vector4 Sample(Color[] s, int w, int h, float fx, float fy)
+		private static void GlowRect(Vector2 c, SkinTex s, int shape, Color tint, float alpha)
 		{
-			int x0 = (int)MathF.Floor(fx), y0 = (int)MathF.Floor(fy);
-			float tx = fx - x0, ty = fy - y0;
-			int x1 = Math.Clamp(x0 + 1, 0, w - 1), y1 = Math.Clamp(y0 + 1, 0, h - 1);
-			x0 = Math.Clamp(x0, 0, w - 1);
-			y0 = Math.Clamp(y0, 0, h - 1);
-			Vector4 top = Vector4.Lerp(s[y0 * w + x0].ToVector4(), s[y0 * w + x1].ToVector4(), tx);
-			Vector4 bottom = Vector4.Lerp(s[y1 * w + x0].ToVector4(), s[y1 * w + x1].ToVector4(), tx);
-			return Vector4.Lerp(top, bottom, ty);
+			float k = shape == 0 ? 1.35f : 1.6f;
+			int gw = (int)(s.W * k), gh = (int)(s.H * k);
+			batch!.Draw(glow!, new Rectangle((int)Math.Round(c.X - gw / 2f), (int)Math.Round(c.Y - gh / 2f), gw, gh), tint * alpha);
 		}
 
-		private static Texture2D BuildShapeTexture(GraphicsDevice device, Btn b)
+		private static void DrawShapedGlow(Btn b)
 		{
+			SkinTex? s = ShapeSkin(b);
+			if (s == null)
+				return;
 			int i = (int)b;
-			int tw = Math.Clamp((int)Math.Round(BtnW(b)), 8, 1024);
-			int th = Math.Clamp((int)Math.Round(BtnH(b)), 8, 1024);
-			Color[]? src = null;
-			int sw = 0, sh = 0;
-			if (btnIcon[i] != null)
+			int rgb = SpriteOf(b).GlowRgb;
+			Color tint = btnColor[i] ?? new Color((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255);
+			GlowRect(Center(b), s, btnShape[i], tint, OpacityOf(b) * (pressed[i] ? 0.75f : 0.55f));
+		}
+
+		private static void DrawShaped(Btn b)
+		{
+			SkinTex? s = ShapeSkin(b);
+			if (s == null)
+				return;
+			int i = (int)b;
+			bool down = pressed[i];
+			Vector2 c = Center(b);
+			batch!.Draw(s.Tex, new Rectangle((int)Math.Round(c.X - s.W / 2f), (int)Math.Round(c.Y - s.H / 2f) + (down ? s.Cell : 0), s.W, s.H), Color.White * (down ? 1f : OpacityOf(b)));
+		}
+
+		private static SkinTex? CustomSkinOf(int i)
+		{
+			if (i >= customBuilt.Length)
+				return null;
+			if (!customBuilt[i])
 			{
+				customBuilt[i] = true;
 				try
 				{
-					using FileStream fs = File.OpenRead(Path.Combine(iconDir, btnIcon[i]!));
-					using Texture2D t = Texture2D.FromStream(device, fs);
-					sw = t.Width;
-					sh = t.Height;
-					src = new Color[sw * sh];
-					t.GetData(src);
+					CustomBtn c = customBtns[i];
+					string? ic = c.Icon;
+					customSkin[i] = BuildSkinTex(batch!.GraphicsDevice, PixelButtonArt.PaletteFrom(c.Rgb), c.Shape, CustomW(i), CustomH(i), c.Label.Length > 0 ? c.Label : null, false, ref ic);
 				}
 				catch (Exception)
 				{
-					src = null;
-					btnIcon[i] = null;
+					customSkin[i] = null;
 				}
 			}
+			return customSkin[i];
+		}
 
-			int rgb = SpriteOf(b).GlowRgb;
-			Color fillColor = btnColor[i] ?? new Color((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255);
-			Vector4 fill = fillColor.ToVector4();
-			Vector4 border = src != null ? Vector4.One : Vector4.Lerp(fill, Vector4.One, 0.65f);
+		private static float CustomAlpha(CustomBtn c) => c.Opacity < 0f ? ButtonOpacity : (c.Opacity <= 0.45f ? c.Opacity / 0.45f * 0.9f : Math.Min(1f, 0.9f + (c.Opacity - 0.45f) / 0.55f * 0.1f));
 
-			Color[] data = new Color[tw * th];
-			float hw = tw / 2f, hh = th / 2f;
-			float minHalf = Math.Min(hw, hh);
-			float bw = Math.Max(2f, Math.Min(tw, th) * 0.045f);
-			float rad = Math.Min(tw, th) * 0.2f;
-			int shape = btnShape[i];
-			float cu0 = 0f, cv0 = 0f, cuS = 1f, cvS = 1f;
-			if (src != null)
+		private static void DrawCustomGlows()
+		{
+			for (int i = 0; i < customBtns.Count; i++)
 			{
-				float sa = sw / (float)sh, ta = tw / (float)th;
-				if (sa > ta)
-				{
-					cuS = ta / sa;
-					cu0 = (1f - cuS) / 2f;
-				}
-				else
-				{
-					cvS = sa / ta;
-					cv0 = (1f - cvS) / 2f;
-				}
+				SkinTex? s = CustomSkinOf(i);
+				if (s == null)
+					continue;
+				CustomBtn c = customBtns[i];
+				bool down = i < customPressed.Length && customPressed[i];
+				GlowRect(CustomCenter(i), s, c.Shape, new Color((c.Rgb >> 16) & 255, (c.Rgb >> 8) & 255, c.Rgb & 255), (down ? 1f : CustomAlpha(c)) * (down ? 0.75f : 0.55f));
 			}
+		}
 
-			for (int y = 0; y < th; y++)
+		private static void DrawCustomSkins()
+		{
+			for (int i = 0; i < customBtns.Count; i++)
 			{
-				for (int x = 0; x < tw; x++)
-				{
-					float px = x + 0.5f - hw, py = y + 0.5f - hh;
-					float d;
-					if (shape == 0)
-					{
-						float r = MathF.Sqrt((px / hw) * (px / hw) + (py / hh) * (py / hh));
-						d = (1f - r) * minHalf;
-					}
-					else
-					{
-						float qx = MathF.Abs(px) - (hw - rad), qy = MathF.Abs(py) - (hh - rad);
-						float ox = MathF.Max(qx, 0f), oy = MathF.Max(qy, 0f);
-						d = -(MathF.Sqrt(ox * ox + oy * oy) + MathF.Min(MathF.Max(qx, qy), 0f) - rad);
-					}
-					float edge = Math.Clamp(d, 0f, 1f);
-					if (edge <= 0f)
-						continue;
-					Vector4 col = fill;
-					if (src != null)
-						col = Sample(src, sw, sh, (cu0 + (x + 0.5f) / tw * cuS) * sw - 0.5f, (cv0 + (y + 0.5f) / th * cvS) * sh - 0.5f);
-					col = Vector4.Lerp(col, border, Math.Clamp(bw - d + 0.5f, 0f, 1f));
-					float a = col.W * edge;
-					data[y * tw + x] = new Color(col.X * a, col.Y * a, col.Z * a, a);
-				}
+				SkinTex? s = CustomSkinOf(i);
+				if (s == null)
+					continue;
+				bool down = i < customPressed.Length && customPressed[i];
+				Vector2 c = CustomCenter(i);
+				batch!.Draw(s.Tex, new Rectangle((int)Math.Round(c.X - s.W / 2f), (int)Math.Round(c.Y - s.H / 2f) + (down ? s.Cell : 0), s.W, s.H), Color.White * (down ? 1f : CustomAlpha(customBtns[i])));
 			}
-
-			Texture2D tex = new(device, tw, th);
-			tex.SetData(data);
-			return tex;
 		}
 
 		private static void DrawCircle(Texture2D tex, Vector2 center, float radius, Color color)

@@ -66,6 +66,7 @@ namespace CelesteAndroid
 
 		protected override void OnCreate(Bundle? savedInstanceState)
 		{
+			CultureFix.Apply();
 			RequestedOrientation = LandscapeLock.Orientation;
 			base.OnCreate(savedInstanceState);
 			L.Init(Prefs);
@@ -463,7 +464,7 @@ namespace CelesteAndroid
 				Toast.MakeText(this, L.NoBackups, ToastLength.Long)?.Show();
 				return;
 			}
-			string[] labels = backups.Select(b => b.Time.ToString("g") + "  ·  " + L.SavesCount(b.Count)).ToArray();
+			string[] labels = backups.Select(b => b.Time.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture) + "  ·  " + L.SavesCount(b.Count)).ToArray();
 			new AlertDialog.Builder(this)!
 				.SetTitle(L.SavesPickBackup)!
 				.SetItems(labels, (_, e) =>

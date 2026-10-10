@@ -62,6 +62,7 @@ namespace CelesteAndroid
 
 		protected override void OnCreate(Bundle? savedInstanceState)
 		{
+			CultureFix.Apply();
 			RequestedOrientation = LandscapeLock.Orientation;
 			base.OnCreate(savedInstanceState);
 			L.Init(GetSharedPreferences("launcher", FileCreationMode.Private)!);
@@ -1514,8 +1515,43 @@ namespace CelesteAndroid
 			return bmp;
 		}
 
+		// Foto original no formato do botão: sem moldura, brilho nem pixelização.
+		private void DrawPhoto(Canvas canvas, int i, float cx, float cy)
+		{
+			Bitmap bmp = iconBmp[i]!;
+			float w = BtnW(i), h = BtnH(i);
+			var rect = new RectF(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f);
+			float k = Math.Max(w / bmp.Width, h / bmp.Height);
+			using var matrix = new Matrix();
+			matrix.SetScale(k, k);
+			matrix.PostTranslate(cx - bmp.Width * k / 2f, cy - bmp.Height * k / 2f);
+			using var shader = new BitmapShader(bmp, Shader.TileMode.Clamp!, Shader.TileMode.Clamp!);
+			shader.SetLocalMatrix(matrix);
+			paint.AntiAlias = true;
+			paint.FilterBitmap = true;
+			paint.SetStyle(Paint.Style.Fill!);
+			paint.SetShader(shader);
+			paint.Alpha = Math.Clamp((int)Math.Round(AlphaOf(i) * 255f), 0, 255);
+			if (shape[i] == 0)
+			{
+				canvas.DrawOval(rect, paint);
+			}
+			else
+			{
+				float r = Math.Min(w, h) * 0.12f;
+				canvas.DrawRoundRect(rect, r, r, paint);
+			}
+			paint.SetShader(null);
+			paint.Alpha = 255;
+		}
+
 		private void DrawSkinned(Canvas canvas, int i, float cx, float cy)
 		{
+			if (iconBmp[i] != null)
+			{
+				DrawPhoto(canvas, i, cx, cy);
+				return;
+			}
 			PixelButtonArt.Snap(BtnW(i), BtnH(i), out int cols, out int rows, out int cell);
 			Bitmap bmp = SkinBitmap(i, cols, rows, cell);
 			float w = cols * cell, h = rows * cell;

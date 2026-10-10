@@ -43,6 +43,7 @@ namespace CelesteAndroid
 
 		protected override void OnCreate(Bundle? savedInstanceState)
 		{
+			CultureFix.Apply();
 			RequestedOrientation = LandscapeLock.Orientation;
 			base.OnCreate(savedInstanceState);
 			Org.Fmod.FMOD.Init(this);
@@ -60,6 +61,7 @@ namespace CelesteAndroid
 
 		protected override void Main()
 		{
+			CultureFix.Apply();
 			surviveTimer = new System.Threading.Timer(_ => GraphicsDriver.MarkLaunchOk(this), null, SurviveMs, System.Threading.Timeout.Infinite);
 
 			FNALoggerEXT.LogInfo = msg => Log.Info(LogTag, msg);

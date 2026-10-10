@@ -49,7 +49,7 @@ namespace CelesteAndroid
 				foreach (string line in File.ReadAllLines(path))
 				{
 					string[] kv = line.Split('=');
-					if (kv.Length != 2 || !kv[0].Trim().StartsWith("c"))
+					if (kv.Length != 2 || !kv[0].Trim().StartsWith("c", StringComparison.Ordinal))
 						continue;
 					string[] v = kv[1].Split(',');
 					if ((v.Length != 6 && v.Length != 9) || list.Count >= Max)
@@ -235,6 +235,7 @@ namespace CelesteAndroid
 
 		protected override void OnCreate(Bundle? savedInstanceState)
 		{
+			CultureFix.Apply();
 			RequestedOrientation = LandscapeLock.Orientation;
 			base.OnCreate(savedInstanceState);
 			L.Init(GameOptions.Prefs(this));

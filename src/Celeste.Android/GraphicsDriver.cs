@@ -29,7 +29,7 @@ namespace CelesteAndroid
 				foreach (string? field in fields)
 				{
 					string s = (field ?? "").ToLowerInvariant();
-					if (s.Contains("mediatek") || (s.Length > 2 && s.StartsWith("mt") && char.IsDigit(s[2])))
+					if (s.Contains("mediatek") || (s.Length > 2 && s.StartsWith("mt", StringComparison.Ordinal) && char.IsDigit(s[2])))
 						return true;
 				}
 			}

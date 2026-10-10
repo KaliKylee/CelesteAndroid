@@ -32,6 +32,7 @@ namespace CelesteAndroid
 		private static readonly Color Accent = Color.ParseColor("#F2B8D8");
 
 		private ControlsCanvas canvas = null!;
+		private Button dirButton = null!;
 		private TextView title = null!;
 		private readonly List<Button> tabButtons = new();
 		private readonly List<View> sections = new();
@@ -103,6 +104,7 @@ namespace CelesteAndroid
 			gridMode = Math.Clamp(GameOptions.Prefs(this).GetInt(PrefGrid, 0), 0, 3);
 			canvas.GridMode = gridMode;
 			canvas.SelectionChanged = UpdateBar;
+			canvas.LayoutLoaded = () => { if (dirButton != null) dirButton.Text = canvas.DpadMode ? L.DirDpad : L.DirAnalog; };
 			canvas.FpsChanged = UpdateFpsRow;
 			root.AddView(canvas, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
@@ -283,6 +285,17 @@ namespace CelesteAndroid
 			});
 			opacityRow.AddView(opacitySeek, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
 			box.AddView(opacityRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+			var dirRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+			dirButton = MakeButton(canvas.DpadMode ? L.DirDpad : L.DirAnalog, filled: false);
+			dirButton.Click += (_, _) =>
+			{
+				canvas.DpadMode = !canvas.DpadMode;
+				dirButton.Text = canvas.DpadMode ? L.DirDpad : L.DirAnalog;
+				canvas.Save();
+			};
+			dirRow.AddView(dirButton, new LinearLayout.LayoutParams(0, Dp(34), 1f));
+			box.AddView(dirRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(4) });
 
 			var gridRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
 			gridButton = MakeButton(L.GridLabel(gridMode), filled: false);
@@ -900,6 +913,19 @@ namespace CelesteAndroid
 		public float SelectedScale => scale[Selected];
 
 		private int opacityPercent = GameOptions.DefaultOpacity;
+		private bool dpadMode;
+		public Action? LayoutLoaded { get; set; }
+
+		public bool DpadMode
+		{
+			get => dpadMode;
+			set
+			{
+				dpadMode = value;
+				isDefault = false;
+				Invalidate();
+			}
+		}
 
 		public int OpacityPercent
 		{
@@ -991,6 +1017,7 @@ namespace CelesteAndroid
 			SetDefaults();
 			LoadFile();
 			LoadCustoms();
+			LayoutLoaded?.Invoke();
 			SelectionChanged?.Invoke();
 		}
 
@@ -1059,6 +1086,13 @@ namespace CelesteAndroid
 						continue;
 					}
 					string lineKey = kv[0].Trim();
+					if (lineKey == "dpad")
+					{
+						dpadMode = kv[1].Trim() == "1";
+						if (dpadMode)
+							isDefault = false;
+						continue;
+					}
 					if (lineKey.StartsWith("shape_", StringComparison.Ordinal))
 					{
 						LoadShapeLine(lineKey.Substring(6), kv[1]);
@@ -1088,7 +1122,7 @@ namespace CelesteAndroid
 			SaveCustoms();
 			try
 			{
-				if (isDefault)
+				if (isDefault && !dpadMode)
 				{
 					if (File.Exists(path))
 						File.Delete(path);
@@ -1104,6 +1138,8 @@ namespace CelesteAndroid
 					sb.Append(string.Format(CultureInfo.InvariantCulture, "shape_{0}={1},{2:0.00},{3}\n", Keys[i], shape[i], shape[i] == 2 ? hscale[i] : scale[i], icon[i] ?? "-"));
 				}
 				sb.Append(string.Format(CultureInfo.InvariantCulture, "fps={0},{1:0.0000},{2:0.0000},{3:0.00}\n", fpsCorner, fpsMx, fpsMy, scale[Fps]));
+				if (dpadMode)
+					sb.Append("dpad=1\n");
 				File.WriteAllText(path, sb.ToString());
 			}
 			catch (Exception)
@@ -1402,13 +1438,44 @@ namespace CelesteAndroid
 			if (i == Stick)
 			{
 				float range = StickRange;
-				paint.SetStyle(Paint.Style.Stroke!);
-				paint.StrokeWidth = range * 0.12f;
-				paint.Color = Color.Argb(A(1f), 255, 255, 255);
-				canvas.DrawCircle(cx, cy, range * 1.1f, paint);
-				paint.SetStyle(Paint.Style.Fill!);
-				paint.Color = Color.Argb(A(1.1f), 255, 255, 255);
-				canvas.DrawCircle(cx, cy, range * 0.45f, paint);
+				if (dpadMode)
+				{
+					float s = range * 0.71f, g = s * 1.05f;
+					float[][] dirs = { new[] { 0f, -1f }, new[] { 1f, 0f }, new[] { 0f, 1f }, new[] { -1f, 0f } };
+					for (int k = 0; k < 4; k++)
+					{
+						float px = cx + dirs[k][0] * g, py = cy + dirs[k][1] * g;
+						paint.SetStyle(Paint.Style.Fill!);
+						paint.Color = Color.Argb(A(0.12f), 255, 255, 255);
+						canvas.DrawRoundRect(px - s / 2f, py - s / 2f, px + s / 2f, py + s / 2f, s * 0.1f, s * 0.1f, paint);
+						paint.SetStyle(Paint.Style.Stroke!);
+						paint.StrokeWidth = Math.Max(2f, s * 0.06f);
+						paint.Color = Color.Argb(A(1f), 255, 255, 255);
+						canvas.DrawRoundRect(px - s / 2f, py - s / 2f, px + s / 2f, py + s / 2f, s * 0.1f, s * 0.1f, paint);
+						// triângulo apontando para a direção da seta
+						float ts = s * 0.3f;
+						float dx = dirs[k][0], dy = dirs[k][1];
+						float tx = px + dx * ts * 0.4f, ty = py + dy * ts * 0.4f;
+						var tri = new Android.Graphics.Path();
+						tri.MoveTo(tx + dx * ts, ty + dy * ts);
+						tri.LineTo(tx - dx * ts * 0.5f - dy * ts, ty - dy * ts * 0.5f + dx * ts);
+						tri.LineTo(tx - dx * ts * 0.5f + dy * ts, ty - dy * ts * 0.5f - dx * ts);
+						tri.Close();
+						paint.SetStyle(Paint.Style.Fill!);
+						paint.Color = Color.Argb(A(1.1f), 255, 255, 255);
+						canvas.DrawPath(tri, paint);
+					}
+				}
+				else
+				{
+					paint.SetStyle(Paint.Style.Stroke!);
+					paint.StrokeWidth = range * 0.12f;
+					paint.Color = Color.Argb(A(1f), 255, 255, 255);
+					canvas.DrawCircle(cx, cy, range * 1.1f, paint);
+					paint.SetStyle(Paint.Style.Fill!);
+					paint.Color = Color.Argb(A(1.1f), 255, 255, 255);
+					canvas.DrawCircle(cx, cy, range * 0.45f, paint);
+				}
 			}
 			else if (Skinned(i))
 				DrawSkinned(canvas, i, cx, cy);

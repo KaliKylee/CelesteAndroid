@@ -44,7 +44,6 @@ namespace CelesteAndroid
 
 		private static string PatchStampFile(Context context) => Path.Combine(Files(context), "patched", "patch.stamp");
 
-		// Impressão digital do módulo de patches embutido no APK. Muda a cada versão que altera os patches.
 		private static string CurrentPatchStamp(Context context)
 		{
 			using Stream s = context.Assets!.Open("patcher/Celeste.Android.mm.dll");
@@ -52,7 +51,6 @@ namespace CelesteAndroid
 			return Convert.ToHexString(sha.ComputeHash(s));
 		}
 
-		// O Celeste.dll "patchado" é gerado no aparelho; depois de atualizar o app ele precisa ser refeito.
 		public static bool NeedsRepatch(Context context)
 		{
 			try
@@ -68,7 +66,7 @@ namespace CelesteAndroid
 			}
 		}
 
-		public static bool IsInstalled(Context context) =
+		public static bool IsInstalled(Context context) =>
 			File.Exists(PatchedDll(context)) && Directory.Exists(Path.Combine(GameDir(context), "Content"));
 
 		public static bool HasEmbeddedGame(Context context) =>
@@ -124,7 +122,6 @@ namespace CelesteAndroid
 			CopyAll(files.Select(f => (f[(GameAssetsRoot.Length + 1)..], -1L, (Func<Stream>)(() => context.Assets!.Open(f)))));
 		}
 
-		// ---------- Saves: importar (pasta ou .zip), exportar (.zip) e backups com data ----------
 
 		private const int MaxBackups = 10;
 		private const long MaxSaveBytes = 20L << 20;
@@ -146,7 +143,6 @@ namespace CelesteAndroid
 			return ms.ToArray();
 		}
 
-		// Um save válido é um XML bem formado (formato usado pelo Celeste).
 		private static bool LooksLikeSave(byte[] data)
 		{
 			if (data.Length == 0 || data.Length > MaxSaveBytes)
@@ -273,7 +269,6 @@ namespace CelesteAndroid
 			return dir;
 		}
 
-		// Guarda os saves atuais numa pasta com data/hora e mantém só os últimos backups.
 		private void BackupCurrentSaves()
 		{
 			string target = SavesDir(context);
@@ -299,7 +294,6 @@ namespace CelesteAndroid
 			if (!Directory.Exists(root))
 				return result;
 
-			// Backups antigos ficavam soltos na pasta: agrupa numa pasta datada.
 			string[] flat = Directory.GetFiles(root, "*.celeste");
 			if (flat.Length > 0)
 			{
@@ -333,7 +327,6 @@ namespace CelesteAndroid
 			if (files.Length == 0)
 				throw new InstallException(L.NoBackups);
 
-			// Lê tudo antes: o backup dos saves atuais pode apagar o mais antigo da lista.
 			var data = files.Select(f => (Path.GetFileName(f), File.ReadAllBytes(f))).ToList();
 			BackupCurrentSaves();
 			WriteSaves(data);

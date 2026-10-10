@@ -1888,6 +1888,23 @@ namespace CelesteAndroid
 			paint.Alpha = 255;
 		}
 
+		private void DrawRectGlow(Canvas canvas, float cx, float cy, float w, float h, int cols, int rows, int cell, int cr, int cg, int cb, float peak)
+		{
+			const int Layers = 14;
+			float margin = Math.Max(4f, Math.Min(w, h) * 0.28f);
+			float rr = Math.Clamp(MathF.Round(Math.Min(cols, rows) * 0.2f), 2f, 7f) * cell;
+			float each = 1f - MathF.Pow(1f - Math.Clamp(peak, 0f, 0.99f), 1f / Layers);
+			paint.SetStyle(Paint.Style.Fill!);
+			paint.SetShader(null);
+			paint.Color = Color.Argb(Math.Clamp((int)Math.Round(each * 255f), 0, 255), cr, cg, cb);
+			for (int k = Layers; k >= 1; k--)
+			{
+				float grow = margin * k / Layers;
+				var rect = new RectF(cx - w / 2f - grow, cy - h / 2f - grow, cx + w / 2f + grow, cy + h / 2f + grow);
+				canvas.DrawRoundRect(rect, rr + grow, rr + grow, paint);
+			}
+		}
+
 		private void DrawSkinned(Canvas canvas, int i, float cx, float cy)
 		{
 			if (iconBmp[i] != null)
@@ -1902,13 +1919,13 @@ namespace CelesteAndroid
 			int body = PaletteOf(i)[2];
 			int cr = (body >> 16) & 255, cg = (body >> 8) & 255, cb = body & 255;
 
-			float k = shape[i] == 0 ? 1.35f : 1.6f;
-			float radius = h * k / 2f;
 			int glowA = Math.Clamp((int)Math.Round(alpha * 0.55f * 255f), 0, 255);
-			int glowColor = Color.Argb(glowA, cr, cg, cb).ToArgb();
-			int glowClear = Color.Argb(0, cr, cg, cb).ToArgb();
-			using (var shader = new RadialGradient(0f, 0f, radius, new[] { glowColor, glowColor, glowClear }, new[] { 0f, 0.7f, 1f }, Shader.TileMode.Clamp!))
+			if (shape[i] == 0)
 			{
+				float radius = h * 1.35f / 2f;
+				int glowColor = Color.Argb(glowA, cr, cg, cb).ToArgb();
+				int glowClear = Color.Argb(0, cr, cg, cb).ToArgb();
+				using var shader = new RadialGradient(0f, 0f, radius, new[] { glowColor, glowColor, glowClear }, new[] { 0f, 0.7f, 1f }, Shader.TileMode.Clamp!);
 				canvas.Save();
 				canvas.Translate(cx, cy);
 				canvas.Scale(w / h, 1f);
@@ -1917,6 +1934,10 @@ namespace CelesteAndroid
 				canvas.DrawCircle(0f, 0f, radius, paint);
 				paint.SetShader(null);
 				canvas.Restore();
+			}
+			else
+			{
+				DrawRectGlow(canvas, cx, cy, w, h, cols, rows, cell, cr, cg, cb, glowA / 255f);
 			}
 
 			paint.SetStyle(Paint.Style.Fill!);

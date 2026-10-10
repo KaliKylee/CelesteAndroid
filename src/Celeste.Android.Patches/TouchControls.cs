@@ -69,6 +69,7 @@ namespace CelesteAndroid
 
 		private static readonly Keys?[] btnKey = new Keys?[5];
 		private static readonly Color?[] btnColor = new Color?[5];
+		private static readonly string?[] btnText = new string?[5];
 		private static readonly float[] btnOpacity = { -1f, -1f, -1f, -1f, -1f };
 
 		// Forma/ícone dos botões padrão (0 = círculo, 1 = quadrado, 2 = retângulo)
@@ -89,7 +90,7 @@ namespace CelesteAndroid
 		private static SkinTex?[] customSkin = new SkinTex?[0];
 		private static bool[] customBuilt = new bool[0];
 
-		private static bool Shaped(Btn b) => btnShape[(int)b] != 0 || btnIcon[(int)b] != null;
+		private static bool Shaped(Btn b) => btnShape[(int)b] != 0 || btnIcon[(int)b] != null || btnColor[(int)b].HasValue || (btnText[(int)b] != null && b != Btn.Pause);
 
 		private static bool ValidIconName(string n)
 		{
@@ -291,8 +292,9 @@ namespace CelesteAndroid
 						continue;
 					int idx = kv[0].Trim() switch { "jump" => 0, "dash" => 1, "grab" => 2, "pause" => 3, "tab" => 4, _ => -1 };
 					string[] v = kv[1].Split(',');
-					if (idx < 0 || v.Length != 3)
+					if (idx < 0 || (v.Length != 3 && v.Length != 4))
 						continue;
+					btnText[idx] = v.Length == 4 ? PixelButtonArt.CleanLabel(v[3]) : null;
 					btnKey[idx] = Enum.TryParse(v[0].Trim(), out Keys k) && v[0].Trim() != "-" ? k : null;
 					if (v[1].Trim().Length == 6 && int.TryParse(v[1].Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int rgb))
 						btnColor[idx] = new Color((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255);
@@ -813,7 +815,7 @@ namespace CelesteAndroid
 			batch!.Draw(sprites[(int)b]!, SpriteRect(b), (btnColor[(int)b] ?? Color.White) * alpha);
 		}
 
-		private static string? ShapeLabel(Btn b) => b switch { Btn.Jump => "A", Btn.Dash => "X", Btn.Grab => "G", Btn.Tab => "TAB", _ => null };
+		private static string? ShapeLabel(Btn b) => btnText[(int)b] ?? b switch { Btn.Jump => "A", Btn.Dash => "X", Btn.Grab => "G", Btn.Tab => "TAB", _ => null };
 
 		// Foto da galeria exibida como está (recortada na forma do botão), sem moldura nem efeitos.
 		private static SkinTex? BuildPhotoTex(GraphicsDevice device, int shape, float w, float h, ref string? iconName)

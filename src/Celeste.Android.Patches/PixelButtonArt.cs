@@ -236,10 +236,41 @@ namespace CelesteAndroid
 		};
 
 		// Texto curto mostrado num botão ligado a uma tecla (F11, ESC, TAB, SPC...).
+		// Botões de gamepad que um botão de toque pode emular (guardados como "pad:<id>").
+		public static readonly string[] PadIds = { "A", "B", "X", "Y", "LB", "RB", "LT", "RT", "L3", "R3", "Back", "Start", "Up", "Down", "Left", "Right" };
+
+		public static string PadName(string id) => id switch
+		{
+			"Up" => "D-Pad Up", "Down" => "D-Pad Down", "Left" => "D-Pad Left", "Right" => "D-Pad Right", _ => id,
+		};
+
+		private static string PadLabel(string id) => id switch
+		{
+			"Back" => "BACK", "Start" => "STRT", "Up" => "DU", "Down" => "DD", "Left" => "DL", "Right" => "DR", _ => id,
+		};
+
+		// Texto digitado pelo usuário: só A-Z e 0-9 (o que a fonte pixel desenha), até 4 caracteres.
+		public static string? CleanLabel(string? t)
+		{
+			if (string.IsNullOrEmpty(t))
+				return null;
+			var sb = new System.Text.StringBuilder();
+			foreach (char c in t.ToUpperInvariant())
+			{
+				if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))
+					sb.Append(c);
+				if (sb.Length >= 4)
+					break;
+			}
+			return sb.Length == 0 ? null : sb.ToString();
+		}
+
 		public static string LabelFor(string n)
 		{
 			if (string.IsNullOrEmpty(n) || n == "-")
 				return "";
+			if (n.StartsWith("pad:", StringComparison.Ordinal))
+				return PadLabel(n.Substring(4));
 			if (n.Length == 2 && n[0] == 'D' && char.IsDigit(n[1]))
 				return n.Substring(1);
 			if (n.StartsWith("NumPad", StringComparison.Ordinal))

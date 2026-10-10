@@ -119,6 +119,7 @@ namespace CelesteAndroid
 		private struct CustomBtn
 		{
 			public Keys? Key;
+			public Buttons? Pad; // botão de gamepad emulado (padrão); Key = tecla do teclado
 			public Color Color;
 			public float Opacity; // -1 = geral
 			public float X, Y, Scale;
@@ -168,9 +169,15 @@ namespace CelesteAndroid
 					if (kv.Length != 2 || !kv[0].Trim().StartsWith("c", StringComparison.Ordinal))
 						continue;
 					string[] v = kv[1].Split(',');
-					if ((v.Length != 6 && v.Length != 9) || customBtns.Count >= 12)
+					if ((v.Length != 6 && v.Length != 9 && v.Length != 10) || customBtns.Count >= 12)
 						continue;
-					Keys? key = v[0].Trim() != "-" && Enum.TryParse(v[0].Trim(), out Keys k) ? k : null;
+					string action = v[0].Trim();
+					Keys? key = null;
+					Buttons? pad = null;
+					if (action.StartsWith("pad:", StringComparison.Ordinal))
+						pad = PadFromId(action.Substring(4));
+					else if (action != "-" && Enum.TryParse(action, out Keys k))
+						key = k;
 					int rgb = 0x4DA3FF;
 					if (v[1].Trim().Length == 6)
 						int.TryParse(v[1].Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out rgb);
@@ -180,7 +187,7 @@ namespace CelesteAndroid
 					int cshape = 0;
 					float chs = cscale;
 					string? cicon = null;
-					if (v.Length == 9)
+					if (v.Length >= 9)
 					{
 						cshape = Math.Clamp((int)F(v[6], 0f), 0, 2);
 						chs = Math.Clamp(F(v[7], cscale * 100f), 40f, 250f) / 100f;
@@ -191,12 +198,14 @@ namespace CelesteAndroid
 					customBtns.Add(new CustomBtn
 					{
 						Key = key,
+						Pad = pad,
 						Color = new Color((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255),
 						Opacity = op < 0f ? -1f : Math.Clamp(op, 0f, 100f) / 100f,
 						X = Math.Clamp(F(v[3], 50f), 0f, 100f) / 100f,
 						Y = Math.Clamp(F(v[4], 50f), 0f, 100f) / 100f,
 						Scale = cscale,
-						Label = key.HasValue ? PixelButtonArt.LabelFor(key.Value.ToString()) : "",
+						Label = (v.Length == 10 ? PixelButtonArt.CleanLabel(v[9]) : null)
+							?? (pad.HasValue ? PixelButtonArt.LabelFor(action) : key.HasValue ? PixelButtonArt.LabelFor(key.Value.ToString()) : ""),
 						Rgb = rgb & 0xFFFFFF,
 						Shape = cshape,
 						HScale = chs,
@@ -211,6 +220,17 @@ namespace CelesteAndroid
 			customSkin = new SkinTex?[customBtns.Count];
 			customBuilt = new bool[customBtns.Count];
 		}
+
+		private static Buttons? PadFromId(string id) => id switch
+		{
+			"A" => Buttons.A, "B" => Buttons.B, "X" => Buttons.X, "Y" => Buttons.Y,
+			"LB" => Buttons.LeftShoulder, "RB" => Buttons.RightShoulder,
+			"LT" => Buttons.LeftTrigger, "RT" => Buttons.RightTrigger,
+			"L3" => Buttons.LeftStick, "R3" => Buttons.RightStick,
+			"Back" => Buttons.Back, "Start" => Buttons.Start,
+			"Up" => Buttons.DPadUp, "Down" => Buttons.DPadDown, "Left" => Buttons.DPadLeft, "Right" => Buttons.DPadRight,
+			_ => null,
+		};
 
 		private static float CustomW(int i) => BaseUnit * customBtns[i].Scale;
 
@@ -568,7 +588,17 @@ namespace CelesteAndroid
 			if (s.Y < -0.5f) down.Add(Buttons.DPadDown);
 			if (s.X < -0.5f) down.Add(Buttons.DPadLeft);
 			if (s.X > 0.5f) down.Add(Buttons.DPadRight);
-			return new GamePadState(s, Vector2.Zero, pressed[(int)Btn.Tab] ? 1f : 0f, pressed[(int)Btn.Grab] ? 1f : 0f, down.ToArray());
+			float lt = pressed[(int)Btn.Tab] ? 1f : 0f, rt = pressed[(int)Btn.Grab] ? 1f : 0f;
+			for (int i = 0; i < customBtns.Count && i < customPressed.Length; i++)
+			{
+				if (!customPressed[i] || !customBtns[i].Pad.HasValue)
+					continue;
+				Buttons p = customBtns[i].Pad!.Value;
+				if (p == Buttons.LeftTrigger) lt = 1f;
+				else if (p == Buttons.RightTrigger) rt = 1f;
+				else down.Add(p);
+			}
+			return new GamePadState(s, Vector2.Zero, lt, rt, down.ToArray());
 		}
 
 		public static GamePadState GetState(PlayerIndex index, Func<GamePadState> real)

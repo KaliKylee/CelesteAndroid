@@ -28,8 +28,11 @@ namespace CelesteAndroid
 		public string Key = "-";
 		public int Rgb = 0x4DA3FF;
 		public int Opacity = -1;   // -1 = opacidade geral
-		public int X = 50, Y = 50; // % da tela
-		public int Size = 100;     // % do tamanho padrão
+		public float X = 50f, Y = 50f; // % da tela
+		public int Size = 100;     // % do tamanho padrão (largura)
+		public int Shape = 0;      // 0 = círculo, 1 = quadrado, 2 = retângulo
+		public int HSize = -1;     // % da altura no retângulo (-1 = igual à largura)
+		public string? Icon;       // foto escolhida na galeria
 	}
 
 	public static class CustomButtons
@@ -49,18 +52,22 @@ namespace CelesteAndroid
 					if (kv.Length != 2 || !kv[0].Trim().StartsWith("c"))
 						continue;
 					string[] v = kv[1].Split(',');
-					if (v.Length != 6 || list.Count >= Max)
+					if ((v.Length != 6 && v.Length != 9) || list.Count >= Max)
 						continue;
 					int I(string t, int d) => int.TryParse(t.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int r) ? r : d;
+					float Fl(string t, float d) => float.TryParse(t.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float r) ? r : d;
 					int rgb = v[1].Trim().Length == 6 && int.TryParse(v[1].Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int c) ? c : 0x4DA3FF;
 					list.Add(new CustomButton
 					{
 						Key = v[0].Trim().Length > 0 ? v[0].Trim() : "-",
 						Rgb = rgb,
 						Opacity = I(v[2], -1),
-						X = Math.Clamp(I(v[3], 50), 0, 100),
-						Y = Math.Clamp(I(v[4], 50), 0, 100),
+						X = Math.Clamp(Fl(v[3], 50f), 0f, 100f),
+						Y = Math.Clamp(Fl(v[4], 50f), 0f, 100f),
 						Size = Math.Clamp(I(v[5], 100), 40, 250),
+						Shape = v.Length == 9 ? Math.Clamp(I(v[6], 0), 0, 2) : 0,
+						HSize = v.Length == 9 ? Math.Clamp(I(v[7], -1), 40, 250) : -1,
+						Icon = v.Length == 9 && v[8].Trim().Length > 0 && v[8].Trim() != "-" ? v[8].Trim() : null,
 					});
 				}
 			}
@@ -83,8 +90,11 @@ namespace CelesteAndroid
 			{
 				CustomButton b = list[i];
 				sb.Append('c').Append(i + 1).Append('=').Append(b.Key).Append(',').Append(b.Rgb.ToString("X6", CultureInfo.InvariantCulture)).Append(',')
-					.Append(b.Opacity.ToString(CultureInfo.InvariantCulture)).Append(',').Append(b.X.ToString(CultureInfo.InvariantCulture)).Append(',')
-					.Append(b.Y.ToString(CultureInfo.InvariantCulture)).Append(',').Append(b.Size.ToString(CultureInfo.InvariantCulture)).Append('\n');
+					.Append(b.Opacity.ToString(CultureInfo.InvariantCulture)).Append(',').Append(b.X.ToString("0.##", CultureInfo.InvariantCulture)).Append(',')
+					.Append(b.Y.ToString("0.##", CultureInfo.InvariantCulture)).Append(',').Append(b.Size.ToString(CultureInfo.InvariantCulture));
+				if (b.Shape != 0 || b.Icon != null)
+					sb.Append(',').Append(b.Shape.ToString(CultureInfo.InvariantCulture)).Append(',').Append((b.HSize > 0 ? b.HSize : b.Size).ToString(CultureInfo.InvariantCulture)).Append(',').Append(b.Icon ?? "-");
+				sb.Append('\n');
 			}
 			File.WriteAllText(path, sb.ToString());
 		}
@@ -272,7 +282,7 @@ namespace CelesteAndroid
 			add.Enabled = customs.Count < CustomButtons.Max;
 			add.Click += (_, _) =>
 			{
-				customs.Add(new CustomButton { X = 50, Y = 50 });
+				customs.Add(new CustomButton { X = 36 + (customs.Count % 7) * 5, Y = 40 + (customs.Count / 7) * 14 });
 				SetContentView(BuildLayout());
 				HideSystemBars();
 			};
@@ -358,8 +368,8 @@ namespace CelesteAndroid
 			opRow.AddView(useGlobal, new LinearLayout.LayoutParams(-2, -2) { LeftMargin = Dp(8) });
 			card.AddView(opRow, new LinearLayout.LayoutParams(-1, -2) { TopMargin = Dp(4) });
 
-			card.AddView(SliderRow("X", 0, 100, cb.X, v => cb.X = v, "%"), new LinearLayout.LayoutParams(-1, -2));
-			card.AddView(SliderRow("Y", 0, 100, cb.Y, v => cb.Y = v, "%"), new LinearLayout.LayoutParams(-1, -2));
+			card.AddView(SliderRow("X", 0, 100, (int)Math.Round(cb.X), v => cb.X = v, "%"), new LinearLayout.LayoutParams(-1, -2));
+			card.AddView(SliderRow("Y", 0, 100, (int)Math.Round(cb.Y), v => cb.Y = v, "%"), new LinearLayout.LayoutParams(-1, -2));
 			card.AddView(SliderRow(L.Size, 40, 250, cb.Size, v => cb.Size = v, "%"), new LinearLayout.LayoutParams(-1, -2));
 			return card;
 		}

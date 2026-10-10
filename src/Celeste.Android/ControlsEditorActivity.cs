@@ -202,12 +202,12 @@ namespace CelesteAndroid
 			var box = new LinearLayout(this) { Orientation = Orientation.Vertical };
 			LinearLayout widthRow = SeekRow(out widthLabel, out widthSeek, 150, p =>
 			{
-				canvas.SetSelectedScale(0.5f + p / 100f);
+				canvas.SetSelectedScale((canvas.SelectedMinPct + p) / 100f);
 				UpdateBar();
 			});
 			heightRow = SeekRow(out heightLabel, out heightSeek, 150, p =>
 			{
-				canvas.SetSelectedScaleH(0.5f + p / 100f);
+				canvas.SetSelectedScaleH((canvas.SelectedMinPct + p) / 100f);
 				UpdateBar();
 			});
 			box.AddView(widthRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
@@ -404,7 +404,7 @@ namespace CelesteAndroid
 		private bool ApplyIcon(Android.Net.Uri uri)
 		{
 			int target = pickTarget;
-			if (target < ControlsCanvas.Jump || target > ControlsCanvas.Tab)
+			if (!canvas.IsShapeable(target))
 				return false;
 			Bitmap? bmp = DecodeIcon(uri, 512);
 			if (bmp == null)
@@ -589,16 +589,21 @@ namespace CelesteAndroid
 		private void UpdateBar()
 		{
 			int sel = canvas.Selected;
-			title.Text = sel == ControlsCanvas.Fps ? "FPS" : ControlsCanvas.Names[sel];
+			title.Text = canvas.SelectedName;
 
 			bool shapeOk = canvas.ShapeSupported;
 			bool rect = shapeOk && canvas.SelectedShape == 2;
+			int minPct = canvas.SelectedMinPct, maxPct = canvas.SelectedMaxPct;
 			int wPct = (int)Math.Round(canvas.SelectedScale * 100f);
 			int hPct = (int)Math.Round(canvas.SelectedScaleH * 100f);
-			if (widthSeek.Progress != wPct - 50)
-				widthSeek.Progress = wPct - 50;
-			if (heightSeek.Progress != hPct - 50)
-				heightSeek.Progress = hPct - 50;
+			if (widthSeek.Max != maxPct - minPct)
+				widthSeek.Max = maxPct - minPct;
+			if (heightSeek.Max != maxPct - minPct)
+				heightSeek.Max = maxPct - minPct;
+			if (widthSeek.Progress != wPct - minPct)
+				widthSeek.Progress = wPct - minPct;
+			if (heightSeek.Progress != hPct - minPct)
+				heightSeek.Progress = hPct - minPct;
 			heightRow.Visibility = rect ? ViewStates.Visible : ViewStates.Gone;
 			widthLabel.Text = $"{(rect ? L.WidthLabel : L.SizeLabel)}: {wPct}%";
 			heightLabel.Text = $"{L.HeightLabel}: {hPct}%";
@@ -749,6 +754,19 @@ namespace CelesteAndroid
 							keep.Add(v[2].Trim());
 					}
 				}
+				string customFile = Path.Combine(Path.GetDirectoryName(layoutPath) ?? "", "custom_buttons.txt");
+				if (File.Exists(customFile))
+				{
+					foreach (string line in File.ReadAllLines(customFile))
+					{
+						string[] kv = line.Split('=');
+						if (kv.Length != 2)
+							continue;
+						string[] v = kv[1].Split(',');
+						if (v.Length == 9)
+							keep.Add(v[8].Trim());
+					}
+				}
 				foreach (string file in Directory.GetFiles(dir))
 				{
 					if (!keep.Contains(Path.GetFileName(file)))
@@ -783,7 +801,7 @@ namespace CelesteAndroid
 
 	internal sealed class ControlsCanvas : View
 	{
-		public const int Stick = 0, Jump = 1, Dash = 2, Grab = 3, Pause = 4, Tab = 5, Count = 6, Fps = 6;
+		public const int Stick = 0, Jump = 1, Dash = 2, Grab = 3, Pause = 4, Tab = 5, Count = 6, Fps = 6, CustomBase = 7, MaxCustom = 12, Total = CustomBase + MaxCustom;
 
 		public static string[] Names => L.ControlNames;
 		private static readonly string[] Keys = { "stick", "jump", "dash", "grab", "pause", "tab" };
@@ -799,20 +817,33 @@ namespace CelesteAndroid
 		private const float StickBottom = 0.28f;
 
 		private readonly string path;
-		private readonly float[] fx = new float[Count];
-		private readonly float[] fy = new float[Count];
-		private readonly float[] scale = new float[Count + 1];
-		private readonly int[] shape = new int[Count];
-		private readonly float[] hscale = new float[Count];
-		private readonly string?[] icon = new string?[Count];
-		private readonly Bitmap?[] iconBmp = new Bitmap?[Count];
+		private readonly float[] fx = new float[Total];
+		private readonly float[] fy = new float[Total];
+		private readonly float[] scale = new float[Total];
+		private readonly int[] shape = new int[Total];
+		private readonly float[] hscale = new float[Total];
+		private readonly string?[] icon = new string?[Total];
+		private readonly Bitmap?[] iconBmp = new Bitmap?[Total];
+		private readonly int[][] iconPx = new int[Total][];
 
-		public static string KeyOf(int i) => Keys[i];
+		public static string KeyOf(int i) => i < Count ? Keys[i] : "c" + (i - CustomBase + 1);
 
-		public bool ShapeSupported => Selected >= Jump && Selected <= Tab;
+		// Botões criados pelo usuário (custom_buttons.txt), editáveis aqui como os demais.
+		private List<CustomButton> customs = new();
+		private readonly Dictionary<string, Bitmap> skinCache = new();
+		private string CustomPath => Path.Combine(Path.GetDirectoryName(path) ?? "", "custom_buttons.txt");
+
+		public bool IsCustom(int i) => i >= CustomBase && i < CustomBase + customs.Count;
+		public bool IsShapeable(int i) => (i >= Jump && i <= Tab) || IsCustom(i);
+		public bool ShapeSupported => IsShapeable(Selected);
 		public int SelectedShape => ShapeSupported ? shape[Selected] : 0;
 		public float SelectedScaleH => ShapeSupported && shape[Selected] == 2 ? hscale[Selected] : scale[Selected];
 		public bool SelectedHasIcon => ShapeSupported && icon[Selected] != null;
+		public int SelectedMinPct => IsCustom(Selected) ? 40 : 50;
+		public int SelectedMaxPct => IsCustom(Selected) ? 250 : 200;
+		public string SelectedName => Selected == Fps ? "FPS" : IsCustom(Selected) ? "#" + (Selected - CustomBase + 1) + " " + ButtonStyles.Display(customs[Selected - CustomBase].Key) : Names[Selected];
+		private float MinScale(int i) => IsCustom(i) ? 0.4f : 0.5f;
+		private float MaxScale(int i) => IsCustom(i) ? 2.5f : 2f;
 		private readonly Paint paint = new(PaintFlags.AntiAlias);
 		private bool ready;
 		private bool isDefault = true;
@@ -905,7 +936,7 @@ namespace CelesteAndroid
 		private float BtnH(int i) => (i == Pause ? 0.32f : i == Tab ? 0.4f : 0.5f) * Unit * 2f * (shape[i] == 2 ? hscale[i] : scale[i]);
 		private float HalfW(int i) => i == Stick ? StickRange * 1.1f : BtnW(i) / 2f;
 		private float HalfH(int i) => i == Stick ? StickRange * 1.1f : BtnH(i) / 2f;
-		private bool Skinned(int i) => i >= Jump && i <= Tab && (shape[i] != 0 || iconBmp[i] != null);
+		private bool Skinned(int i) => IsCustom(i) || (i >= Jump && i <= Tab && (shape[i] != 0 || iconBmp[i] != null));
 
 		private float HitScore(int i, float x, float y)
 		{
@@ -958,6 +989,7 @@ namespace CelesteAndroid
 			ready = true;
 			SetDefaults();
 			LoadFile();
+			LoadCustoms();
 			SelectionChanged?.Invoke();
 		}
 
@@ -976,9 +1008,7 @@ namespace CelesteAndroid
 			{
 				shape[i] = 0;
 				hscale[i] = 1f;
-				icon[i] = null;
-				iconBmp[i]?.Recycle();
-				iconBmp[i] = null;
+				DropIcon(i);
 			}
 			fpsCorner = 0;
 			fpsMx = Math.Max(2f, h * 0.0045f) * 3f / w;
@@ -995,6 +1025,7 @@ namespace CelesteAndroid
 		public void ResetToDefaults()
 		{
 			SetDefaults();
+			ResetCustoms();
 			Invalidate();
 		}
 
@@ -1053,6 +1084,7 @@ namespace CelesteAndroid
 
 		public void Save()
 		{
+			SaveCustoms();
 			try
 			{
 				if (isDefault)
@@ -1094,11 +1126,7 @@ namespace CelesteAndroid
 			{
 				Bitmap? bmp = TryLoadIcon(name);
 				if (bmp != null)
-				{
-					iconBmp[idx]?.Recycle();
-					iconBmp[idx] = bmp;
-					icon[idx] = name;
-				}
+					AssignIcon(idx, name, bmp);
 			}
 			isDefault = false;
 		}
@@ -1118,6 +1146,24 @@ namespace CelesteAndroid
 			}
 		}
 
+		private void AssignIcon(int i, string name, Bitmap bmp)
+		{
+			iconBmp[i]?.Recycle();
+			iconBmp[i] = bmp;
+			icon[i] = name;
+			var px = new int[bmp.Width * bmp.Height];
+			bmp.GetPixels(px, 0, bmp.Width, 0, 0, bmp.Width, bmp.Height);
+			iconPx[i] = px;
+		}
+
+		private void DropIcon(int i)
+		{
+			iconBmp[i]?.Recycle();
+			iconBmp[i] = null;
+			icon[i] = null;
+			iconPx[i] = null;
+		}
+
 		public void SetSelectedShape(int s)
 		{
 			if (!ShapeSupported)
@@ -1125,7 +1171,20 @@ namespace CelesteAndroid
 			int old = shape[Selected];
 			shape[Selected] = Math.Clamp(s, 0, 2);
 			if (shape[Selected] == 2 && old != 2)
+			{
+				float min = MinScale(Selected);
+				float h = scale[Selected] * 0.65f;
+				if (h < min)
+				{
+					h = min;
+					scale[Selected] = Math.Min(MaxScale(Selected), min / 0.65f);
+				}
+				hscale[Selected] = h;
+			}
+			else if (shape[Selected] != 2)
+			{
 				hscale[Selected] = scale[Selected];
+			}
 			isDefault = false;
 			ClampSelected();
 			Invalidate();
@@ -1135,7 +1194,7 @@ namespace CelesteAndroid
 		{
 			if (!ShapeSupported || shape[Selected] != 2)
 				return;
-			hscale[Selected] = Math.Clamp(s, 0.5f, 2f);
+			hscale[Selected] = Math.Clamp(s, MinScale(Selected), MaxScale(Selected));
 			isDefault = false;
 			ClampSelected();
 			Invalidate();
@@ -1143,14 +1202,12 @@ namespace CelesteAndroid
 
 		public bool SetIcon(int i, string name)
 		{
-			if (i < Jump || i > Tab)
+			if (!IsShapeable(i))
 				return false;
 			Bitmap? bmp = TryLoadIcon(name);
 			if (bmp == null)
 				return false;
-			iconBmp[i]?.Recycle();
-			iconBmp[i] = bmp;
-			icon[i] = name;
+			AssignIcon(i, name, bmp);
 			isDefault = false;
 			Invalidate();
 			return true;
@@ -1158,18 +1215,77 @@ namespace CelesteAndroid
 
 		public void ClearIcon(int i)
 		{
-			if (i < Jump || i > Tab)
+			if (!IsShapeable(i))
 				return;
-			iconBmp[i]?.Recycle();
-			iconBmp[i] = null;
-			icon[i] = null;
+			DropIcon(i);
 			isDefault = false;
 			Invalidate();
 		}
 
+		private void LoadCustoms()
+		{
+			for (int i = CustomBase; i < Total; i++)
+				DropIcon(i);
+			customs = CustomButtons.Load(CustomPath);
+			for (int k = 0; k < customs.Count; k++)
+			{
+				int i = CustomBase + k;
+				CustomButton cb = customs[k];
+				fx[i] = Math.Clamp(cb.X, 0f, 100f) / 100f;
+				fy[i] = Math.Clamp(cb.Y, 0f, 100f) / 100f;
+				scale[i] = Math.Clamp(cb.Size, 40, 250) / 100f;
+				shape[i] = Math.Clamp(cb.Shape, 0, 2);
+				hscale[i] = shape[i] == 2 ? Math.Clamp(cb.HSize > 0 ? cb.HSize : cb.Size, 40, 250) / 100f : scale[i];
+				if (cb.Icon != null)
+				{
+					Bitmap? bmp = TryLoadIcon(cb.Icon);
+					if (bmp != null)
+						AssignIcon(i, cb.Icon, bmp);
+				}
+				ClampIndex(i);
+			}
+		}
+
+		private void SaveCustoms()
+		{
+			try
+			{
+				if (customs.Count == 0)
+					return;
+				for (int k = 0; k < customs.Count; k++)
+				{
+					int i = CustomBase + k;
+					CustomButton cb = customs[k];
+					cb.X = (float)Math.Round(fx[i] * 100.0, 2);
+					cb.Y = (float)Math.Round(fy[i] * 100.0, 2);
+					cb.Size = (int)Math.Round(scale[i] * 100f);
+					cb.Shape = shape[i];
+					cb.HSize = (int)Math.Round((shape[i] == 2 ? hscale[i] : scale[i]) * 100f);
+					cb.Icon = icon[i];
+				}
+				CustomButtons.Save(CustomPath, customs);
+			}
+			catch (Exception)
+			{
+			}
+		}
+
+		private void ResetCustoms()
+		{
+			for (int k = 0; k < customs.Count; k++)
+			{
+				int i = CustomBase + k;
+				scale[i] = 1f;
+				hscale[i] = 1f;
+				shape[i] = 0;
+				DropIcon(i);
+				ClampIndex(i);
+			}
+		}
+
 		public void SetSelectedScale(float s)
 		{
-			scale[Selected] = Math.Clamp(s, 0.5f, 2f);
+			scale[Selected] = Math.Clamp(s, MinScale(Selected), MaxScale(Selected));
 			if (ShapeSupported && shape[Selected] != 2)
 				hscale[Selected] = scale[Selected];
 			isDefault = false;
@@ -1184,11 +1300,16 @@ namespace CelesteAndroid
 				ClampFps();
 				return;
 			}
-			float mx = HalfW(Selected), my = HalfH(Selected);
-			float px = Math.Clamp(fx[Selected] * Width, mx, Math.Max(mx, Width - mx));
-			float py = Math.Clamp(fy[Selected] * Height, my, Math.Max(my, Height - my));
-			fx[Selected] = px / Width;
-			fy[Selected] = py / Height;
+			ClampIndex(Selected);
+		}
+
+		private void ClampIndex(int i)
+		{
+			float mx = HalfW(i), my = HalfH(i);
+			float px = Math.Clamp(fx[i] * Width, mx, Math.Max(mx, Width - mx));
+			float py = Math.Clamp(fy[i] * Height, my, Math.Max(my, Height - my));
+			fx[i] = px / Width;
+			fy[i] = py / Height;
 		}
 
 		protected override void OnDraw(Canvas? canvas)
@@ -1201,6 +1322,8 @@ namespace CelesteAndroid
 				DrawFpsItem(canvas);
 			for (int i = 0; i < Count; i++)
 				DrawItem(canvas, i);
+			for (int k = 0; k < customs.Count; k++)
+				DrawItem(canvas, CustomBase + k);
 		}
 
 		private void DrawGrid(Canvas canvas)
@@ -1339,108 +1462,89 @@ namespace CelesteAndroid
 			}
 		}
 
-		private static readonly Dictionary<char, string[]> LabelGlyphs = new()
+		private int[] PaletteOf(int i) => IsCustom(i) ? PixelButtonArt.PaletteFrom(customs[i - CustomBase].Rgb) : Sprites[i]!.Rgb;
+
+		private string? LabelOfItem(int i)
 		{
-			['A'] = new[] { "01110", "10001", "10001", "11111", "10001", "10001", "10001" },
-			['B'] = new[] { "11110", "10001", "10001", "11110", "10001", "10001", "11110" },
-			['G'] = new[] { "01110", "10001", "10000", "10111", "10001", "10001", "01111" },
-			['T'] = new[] { "11111", "00100", "00100", "00100", "00100", "00100", "00100" },
-			['X'] = new[] { "10001", "10001", "01010", "00100", "01010", "10001", "10001" },
-		};
+			if (IsCustom(i))
+			{
+				string l = PixelButtonArt.LabelFor(customs[i - CustomBase].Key);
+				return l.Length > 0 ? l : null;
+			}
+			return i == Jump ? "A" : i == Dash ? "X" : i == Grab ? "G" : i == Tab ? "TAB" : null;
+		}
+
+		private float AlphaOf(int i)
+		{
+			if (!IsCustom(i))
+				return ButtonAlpha;
+			int op = customs[i - CustomBase].Opacity;
+			if (op < 0)
+				return ButtonAlpha;
+			float o = op / 100f;
+			return o <= 0.45f ? o / 0.45f * 0.9f : Math.Min(1f, 0.9f + (o - 0.45f) / 0.55f * 0.1f);
+		}
+
+		// Mesma pixel art do jogo (BuildSkin), em bitmap cacheado.
+		private Bitmap SkinBitmap(int i, int cols, int rows, int cell)
+		{
+			int[] pal = PaletteOf(i);
+			string? label = LabelOfItem(i);
+			string key = i + "|" + shape[i] + "|" + cols + "x" + rows + "|" + cell + "|" + label + "|" + pal[2].ToString("X6") + "|" + icon[i];
+			if (skinCache.TryGetValue(key, out Bitmap? hit))
+				return hit;
+			if (skinCache.Count > 40)
+			{
+				foreach (Bitmap old in skinCache.Values)
+					old.Recycle();
+				skinCache.Clear();
+			}
+			int[]? photo = iconPx[i];
+			Bitmap? src = iconBmp[i];
+			int[] argb = PixelButtonArt.BuildSkin(pal, shape[i], cols, rows, label, i == Pause, photo != null && src != null, out bool[] interior);
+			int bw = cols, bh = rows;
+			if (photo != null && src != null)
+			{
+				argb = PixelButtonArt.Compose(cols, rows, cell, argb, interior, photo, src.Width, src.Height, pal[2]);
+				bw = cols * cell;
+				bh = rows * cell;
+			}
+			Bitmap bmp = Bitmap.CreateBitmap(argb, bw, bh, Bitmap.Config.Argb8888!)!;
+			skinCache[key] = bmp;
+			return bmp;
+		}
 
 		private void DrawSkinned(Canvas canvas, int i, float cx, float cy)
 		{
-			float w = BtnW(i), h = BtnH(i);
-			var rect = new RectF(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f);
-			float rad = Math.Min(w, h) * 0.2f;
-			float alpha = ButtonAlpha;
-			int a255 = Math.Clamp((int)Math.Round(alpha * 255f), 0, 255);
-			int body = Sprites[i]!.GlowRgb;
+			PixelButtonArt.Snap(BtnW(i), BtnH(i), out int cols, out int rows, out int cell);
+			Bitmap bmp = SkinBitmap(i, cols, rows, cell);
+			float w = cols * cell, h = rows * cell;
+			float alpha = AlphaOf(i);
+			int body = PaletteOf(i)[2];
 			int cr = (body >> 16) & 255, cg = (body >> 8) & 255, cb = body & 255;
-			bool hasIcon = iconBmp[i] != null;
 
-			using var clip = new Android.Graphics.Path();
-			if (shape[i] == 0)
-				clip.AddOval(rect, Android.Graphics.Path.Direction.Cw!);
-			else
-				clip.AddRoundRect(rect, rad, rad, Android.Graphics.Path.Direction.Cw!);
+			float k = shape[i] == 0 ? 1.35f : 1.6f;
+			float radius = h * k / 2f;
+			int glowA = Math.Clamp((int)Math.Round(alpha * 0.55f * 255f), 0, 255);
+			int glowColor = Color.Argb(glowA, cr, cg, cb).ToArgb();
+			int glowClear = Color.Argb(0, cr, cg, cb).ToArgb();
+			using (var shader = new RadialGradient(0f, 0f, radius, new[] { glowColor, glowColor, glowClear }, new[] { 0f, 0.7f, 1f }, Shader.TileMode.Clamp!))
+			{
+				canvas.Save();
+				canvas.Translate(cx, cy);
+				canvas.Scale(w / h, 1f);
+				paint.SetStyle(Paint.Style.Fill!);
+				paint.SetShader(shader);
+				canvas.DrawCircle(0f, 0f, radius, paint);
+				paint.SetShader(null);
+				canvas.Restore();
+			}
 
-			canvas.Save();
-			canvas.ClipPath(clip);
 			paint.SetStyle(Paint.Style.Fill!);
-			if (hasIcon)
-			{
-				Bitmap bmp = iconBmp[i]!;
-				float sa = (float)bmp.Width / bmp.Height, ta = w / h;
-				int sw, sh;
-				if (sa > ta)
-				{
-					sh = bmp.Height;
-					sw = (int)Math.Round(sh * ta);
-				}
-				else
-				{
-					sw = bmp.Width;
-					sh = (int)Math.Round(sw / ta);
-				}
-				int sx = (bmp.Width - sw) / 2, sy = (bmp.Height - sh) / 2;
-				paint.FilterBitmap = true;
-				paint.Alpha = a255;
-				canvas.DrawBitmap(bmp, new Rect(sx, sy, sx + sw, sy + sh), rect, paint);
-				paint.Alpha = 255;
-			}
-			else
-			{
-				paint.Color = Color.Argb(a255, cr, cg, cb);
-				canvas.DrawRect(rect, paint);
-			}
-			canvas.Restore();
-
-			paint.SetStyle(Paint.Style.Stroke!);
-			paint.StrokeWidth = Math.Max(Dp(1.5f), Math.Min(w, h) * 0.045f);
-			if (hasIcon)
-				paint.Color = Color.Argb(a255, 255, 255, 255);
-			else
-				paint.Color = Color.Argb(a255, cr + (int)((255 - cr) * 0.65f), cg + (int)((255 - cg) * 0.65f), cb + (int)((255 - cb) * 0.65f));
-			if (shape[i] == 0)
-				canvas.DrawOval(rect, paint);
-			else
-				canvas.DrawRoundRect(rect, rad, rad, paint);
-
-			if (!hasIcon)
-				DrawLabel(canvas, i, cx, cy, w, h, alpha, cr, cg, cb);
-		}
-
-		private void DrawLabel(Canvas canvas, int i, float cx, float cy, float w, float h, float alpha, int cr, int cg, int cb)
-		{
-			float lum = (0.299f * cr + 0.587f * cg + 0.114f * cb) / 255f;
-			int ink = lum > 0.6f ? 0 : 255;
-			int a = Math.Clamp((int)Math.Round(Math.Max(alpha, 0.35f) * 255f), 0, 255);
-			paint.SetStyle(Paint.Style.Fill!);
-			paint.Color = Color.Argb(a, ink, ink, ink);
-			float m = Math.Min(w, h);
-			if (i == Pause)
-			{
-				float bw = Math.Max(2f, m * 0.12f), bh = m * 0.42f, gap = m * 0.14f;
-				canvas.DrawRect(cx - gap / 2f - bw, cy - bh / 2f, cx - gap / 2f, cy + bh / 2f, paint);
-				canvas.DrawRect(cx + gap / 2f, cy - bh / 2f, cx + gap / 2f + bw, cy + bh / 2f, paint);
-				return;
-			}
-			string label = i == Jump ? "A" : i == Dash ? "X" : i == Grab ? "G" : "TAB";
-			float cell = Math.Max(1f, Math.Min(m * 0.5f / 7f, w * 0.7f / (label.Length * 6f - 1f)));
-			float lw = (label.Length * 6f - 1f) * cell, lh = 7f * cell;
-			float x0 = cx - lw / 2f, y0 = cy - lh / 2f;
-			foreach (char ch in label)
-			{
-				if (LabelGlyphs.TryGetValue(ch, out string[]? rows))
-				{
-					for (int yy = 0; yy < rows.Length; yy++)
-						for (int col = 0; col < rows[yy].Length; col++)
-							if (rows[yy][col] == '1')
-								canvas.DrawRect(x0 + col * cell, y0 + yy * cell, x0 + (col + 1) * cell, y0 + (yy + 1) * cell, paint);
-				}
-				x0 += cell * 6f;
-			}
+			paint.FilterBitmap = false;
+			paint.Alpha = Math.Clamp((int)Math.Round(alpha * 255f), 0, 255);
+			canvas.DrawBitmap(bmp, null, new RectF(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f), paint);
+			paint.Alpha = 255;
 		}
 
 		private Bitmap GetBitmap(int i)
@@ -1467,8 +1571,10 @@ namespace CelesteAndroid
 		{
 			int best = -1;
 			float bestScore = float.MaxValue;
-			for (int i = 0; i < Count; i++)
+			for (int i = 0; i < Total; i++)
 			{
+				if (i == Fps || (i > Fps && !IsCustom(i)))
+					continue;
 				float score = HitScore(i, x, y);
 				if (score <= 1f && score < bestScore)
 				{

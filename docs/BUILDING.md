@@ -50,6 +50,7 @@ Why 1.10.14: Celeste's `.bank` files were built with FMOD Studio 1.10, and the g
 
 ```powershell
 scripts\build-natives-android.ps1          # -> natives\android-arm64\libSDL3.so, libFNA3D.so, libFAudio.so
+scripts\build-natives-android.ps1 -Abi armeabi-v7a   # 32-bit -> natives\android-arm\
 ```
 
 API 26, arm64-v8a, `ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON` (16 KB page alignment for Android 15+).
@@ -58,6 +59,7 @@ API 26, arm64-v8a, `ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON` (16 KB page alignmen
 
 ```powershell
 scripts\build-release.ps1                  # public APK (no official art) -> out\
+scripts\build-release.ps1 -Abi armeabi-v7a # 32-bit APK -> out\CelesteAndroid-<version>-arm32.apk (needs fmod\libs\android-arm\)
 scripts\build-release.ps1 -Personal        # official icon/logo from YOUR game files (don't share)
 scripts\build-release.ps1 -Personal -EmbedGame   # also bundles your game (~860 MB; don't share)
 ```
@@ -98,7 +100,7 @@ To force OpenGL ES: `--es driver OpenGL` on `GameActivity`, or the *Graphics* to
 | Secret | What |
 |---|---|
 | `CELESTE_ZIP_URL` | Direct link to a `.zip` (or the bare `Celeste.exe`) of your FNA build. Only `Celeste.exe` is used. |
-| `FMOD_ZIP_URL` | Direct link to a `.zip` with `libfmod.so`, `libfmodstudio.so` (arm64-v8a) and `fmod.jar` from FMOD 1.10.14. The official Android package zip also works. |
+| `FMOD_ZIP_URL` | Direct link to a `.zip` with `libfmod.so`, `libfmodstudio.so` and `fmod.jar` from FMOD 1.10.14, in `arm64-v8a/` and `armeabi-v7a/` folders (both are needed: the workflow builds a 64-bit and a 32-bit APK). The official Android package zip also works. |
 | `KEYSTORE_BASE64`, `KEYSTORE_ALIAS`, `KEYSTORE_PASSWORD` | *(optional)* release keystore (`base64 -w0 my.keystore`). Without it the debug key is used. |
 
 The workflow caches the native libs (SDL3, FNA3D, FAudio), so only the first run (or a submodule update) pays for the CMake build.

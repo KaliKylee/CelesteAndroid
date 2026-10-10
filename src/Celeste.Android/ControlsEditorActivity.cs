@@ -579,7 +579,6 @@ namespace CelesteAndroid
 
 		private void ExportTo(Android.Net.Uri uri)
 		{
-			// Grava o estado atual da tela (posições, tamanhos, FPS) antes de exportar.
 			canvas.Save();
 			ISharedPreferences prefs = GameOptions.Prefs(this);
 			GameOptions.SetOpacity(prefs, canvas.OpacityPercent);
@@ -721,11 +720,11 @@ namespace CelesteAndroid
 				string[] palette = ButtonStyleActivity.Palette;
 				for (int k = 0; k < swatchViews.Count; k++)
 				{
-					bool sel = Convert.ToInt32(palette[k], 16) == sc.Rgb;
+					bool picked = Convert.ToInt32(palette[k], 16) == sc.Rgb;
 					var d = new GradientDrawable();
 					d.SetShape(ShapeType.Oval);
 					d.SetColor(Color.ParseColor("#" + palette[k]));
-					d.SetStroke(Dp(sel ? 3 : 1), sel ? Accent : Color.Argb(160, 255, 255, 255));
+					d.SetStroke(Dp(picked ? 3 : 1), picked ? Accent : Color.Argb(160, 255, 255, 255));
 					swatchViews[k].Background = d;
 				}
 			}
@@ -846,7 +845,6 @@ namespace CelesteAndroid
 			return true;
 		}
 
-		// Apaga imagens que não estão mais no layout salvo (cancelamentos, ícones trocados ou removidos).
 		public static void Cleanup(string layoutPath)
 		{
 			try
@@ -941,7 +939,6 @@ namespace CelesteAndroid
 
 		public static string KeyOf(int i) => i < Count ? Keys[i] : "c" + (i - CustomBase + 1);
 
-		// Botões criados pelo usuário (custom_buttons.txt), editáveis aqui como os demais.
 		private List<CustomButton> customs = new();
 		private readonly Dictionary<string, Bitmap> skinCache = new();
 		private string CustomPath => Path.Combine(Path.GetDirectoryName(path) ?? "", "custom_buttons.txt");
@@ -1614,7 +1611,6 @@ namespace CelesteAndroid
 						paint.StrokeWidth = Math.Max(2f, s * 0.06f);
 						paint.Color = Color.Argb(A(1f), 255, 255, 255);
 						canvas.DrawRoundRect(px - s / 2f, py - s / 2f, px + s / 2f, py + s / 2f, s * 0.1f, s * 0.1f, paint);
-						// triângulo apontando para a direção da seta
 						float ts = s * 0.3f;
 						float dx = dirs[k][0], dy = dirs[k][1];
 						float tx = px + dx * ts * 0.4f, ty = py + dy * ts * 0.4f;
@@ -1716,7 +1712,6 @@ namespace CelesteAndroid
 			return o <= 0.45f ? o / 0.45f * 0.9f : Math.Min(1f, 0.9f + (o - 0.45f) / 0.55f * 0.1f);
 		}
 
-		// Mesma pixel art do jogo (BuildSkin), em bitmap cacheado.
 		private Bitmap SkinBitmap(int i, int cols, int rows, int cell)
 		{
 			int[] pal = PaletteOf(i);
@@ -1745,7 +1740,6 @@ namespace CelesteAndroid
 			return bmp;
 		}
 
-		// Foto original no formato do botão: sem moldura, brilho nem pixelização.
 		private void DrawPhoto(Canvas canvas, int i, float cx, float cy)
 		{
 			Bitmap bmp = iconBmp[i]!;

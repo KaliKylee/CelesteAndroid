@@ -83,6 +83,8 @@ namespace CelesteAndroid
 			public Texture2D Tex = null!;
 			public int W, H, Cell;
 			public bool Photo;
+			public Texture2D? GlowTex;
+			public int GlowMargin;
 		}
 
 		private static readonly SkinTex?[] shapeSkin = new SkinTex?[5];
@@ -928,9 +930,43 @@ namespace CelesteAndroid
 			return shapeSkin[i];
 		}
 
+		private static void BuildRectGlow(SkinTex s)
+		{
+			int m = Math.Max(4, (int)Math.Round(Math.Min(s.W, s.H) * 0.28f));
+			int tw = s.W + m * 2, th = s.H + m * 2;
+			int cols = Math.Max(1, s.W / Math.Max(1, s.Cell)), rows = Math.Max(1, s.H / Math.Max(1, s.Cell));
+			float rr = Math.Clamp(MathF.Round(Math.Min(cols, rows) * 0.2f), 2f, 7f) * s.Cell;
+			float hw = s.W / 2f, hh = s.H / 2f;
+			Color[] data = new Color[tw * th];
+			for (int y = 0; y < th; y++)
+			{
+				for (int x = 0; x < tw; x++)
+				{
+					float qx = MathF.Abs(x + 0.5f - tw / 2f) - (hw - rr), qy = MathF.Abs(y + 0.5f - th / 2f) - (hh - rr);
+					float ox = MathF.Max(qx, 0f), oy = MathF.Max(qy, 0f);
+					float d = MathF.Sqrt(ox * ox + oy * oy) + MathF.Min(MathF.Max(qx, qy), 0f) - rr;
+					float t = Math.Clamp(1f - d / m, 0f, 1f);
+					byte v = (byte)(t * t * (3f - 2f * t) * 255f);
+					data[y * tw + x] = new Color(v, v, v, v);
+				}
+			}
+			Texture2D tex = new(batch!.GraphicsDevice, tw, th);
+			tex.SetData(data);
+			s.GlowTex = tex;
+			s.GlowMargin = m;
+		}
+
 		private static void GlowRect(Vector2 c, SkinTex s, int shape, Color tint, float alpha)
 		{
-			float k = shape == 0 ? 1.35f : 1.6f;
+			if (shape != 0)
+			{
+				if (s.GlowTex == null)
+					BuildRectGlow(s);
+				int rw = s.W + s.GlowMargin * 2, rh = s.H + s.GlowMargin * 2;
+				batch!.Draw(s.GlowTex!, new Rectangle((int)Math.Round(c.X - rw / 2f), (int)Math.Round(c.Y - rh / 2f), rw, rh), tint * alpha);
+				return;
+			}
+			float k = 1.35f;
 			int gw = (int)(s.W * k), gh = (int)(s.H * k);
 			batch!.Draw(glow!, new Rectangle((int)Math.Round(c.X - gw / 2f), (int)Math.Round(c.Y - gh / 2f), gw, gh), tint * alpha);
 		}

@@ -12,7 +12,20 @@ jobs:
   apk:
     runs-on: windows-latest
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64-v8a
+            dir: android-arm64
+            match: arm64
+          - abi: armeabi-v7a
+            dir: android-arm
+            match: armeabi-v7a
     env:
+      ABI: ${{ matrix.abi }}
+      ABI_DIR: ${{ matrix.dir }}
+      ABI_MATCH: ${{ matrix.match }}
       CELESTE_ZIP_URL: ${{ secrets.CELESTE_ZIP_URL }}
       FMOD_ZIP_URL: ${{ secrets.FMOD_ZIP_URL }}
       KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -89,15 +102,16 @@ jobs:
       - name: Fetch FMOD 1.10.14 (private)
         run: |
           $tmp = Join-Path $env:RUNNER_TEMP 'fmod'
-          $dest = 'fmod\libs\android-arm64'
+          $dest = "fmod\libs\$env:ABI_DIR"
           New-Item -ItemType Directory -Force $tmp, $dest | Out-Null
           Invoke-WebRequest -Uri $env:FMOD_ZIP_URL -OutFile (Join-Path $tmp 'fmod.zip')
           Expand-Archive (Join-Path $tmp 'fmod.zip') (Join-Path $tmp 'x') -Force
           foreach ($name in 'libfmod.so', 'libfmodstudio.so', 'fmod.jar') {
             $all = @(Get-ChildItem (Join-Path $tmp 'x') -Recurse -File | Where-Object Name -eq $name)
-            $pick = @($all | Where-Object { $_.FullName -match 'arm64' }) + $all | Select-Object -First 1
-            if (-not $pick) { throw "$name not found in the FMOD download." }
-            Copy-Item $pick.FullName $dest
+            $hit = @($all | Where-Object { $_.FullName -match [regex]::Escape($env:ABI_MATCH) })
+            if ($hit.Count -eq 0 -and ($name -eq 'fmod.jar' -or $env:ABI -eq 'arm64-v8a')) { $hit = $all }
+            if ($hit.Count -eq 0) { throw "$name ($env:ABI) not found in the FMOD download." }
+            Copy-Item $hit[0].FullName $dest
           }
 
       - name: Cache native libs (SDL3, FNA3D, FAudio)
@@ -105,18 +119,18 @@ jobs:
         uses: actions/cache@v4
         with:
           path: natives
-          key: natives-android-arm64-${{ env.NDK_VERSION }}-${{ hashFiles('scripts/build-natives-android.ps1') }}-${{ hashFiles('.gitmodules') }}-${{ github.sha }}
+          key: natives-${{ matrix.dir }}-${{ env.NDK_VERSION }}-${{ hashFiles('scripts/build-natives-android.ps1') }}-${{ hashFiles('.gitmodules') }}-${{ github.sha }}
           restore-keys: |
-            natives-android-arm64-${{ env.NDK_VERSION }}-${{ hashFiles('scripts/build-natives-android.ps1') }}-${{ hashFiles('.gitmodules') }}-
+            natives-${{ matrix.dir }}-${{ env.NDK_VERSION }}-${{ hashFiles('scripts/build-natives-android.ps1') }}-${{ hashFiles('.gitmodules') }}-
 
       - name: Build native libs
         run: |
           $rev = ((git -C external/SDL rev-parse HEAD) + ' ' + (git -C external/FNA rev-parse HEAD)).Trim()
           $stamp = 'natives\.submodules'
-          if ((Test-Path natives\android-arm64\libSDL3.so) -and (Test-Path $stamp) -and ((Get-Content $stamp -Raw).Trim() -eq $rev)) {
+          if ((Test-Path "natives\$env:ABI_DIR\libSDL3.so") -and (Test-Path $stamp) -and ((Get-Content $stamp -Raw).Trim() -eq $rev)) {
             Write-Host 'Natives up to date (cache hit).'
           } else {
-            scripts\build-natives-android.ps1 -Clean
+            scripts\build-natives-android.ps1 -Abi $env:ABI -Clean
             Set-Content $stamp $rev
           }
 
@@ -133,16 +147,26 @@ jobs:
             Set-Content (Join-Path $dir 'keystore.env')
 
       - name: Build public APK
-        run: scripts\build-release.ps1
+        run: scripts\build-release.ps1 -Abi $env:ABI
 
       - uses: actions/upload-artifact@v4
         with:
-          name: CelesteAndroid-apk
+          name: CelesteAndroid-apk-${{ matrix.dir }}
           path: out/*.apk
           if-no-files-found: error
 
-      - name: Attach to GitHub release (tags only)
-        if: startsWith(github.ref, 'refs/tags/')
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: apk
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: CelesteAndroid-apk-*
+          path: out
+          merge-multiple: true
+
+      - name: Attach to GitHub release
         uses: softprops/action-gh-release@v2
         with:
           files: out/*.apk

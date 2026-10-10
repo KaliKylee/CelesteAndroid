@@ -21,7 +21,7 @@ CelesteAndroid is a launcher + runtime that takes the files of the Celeste PC ve
 
 | | |
 |---|---|
-| Device | Android 8.0+ (API 26), **ARM64** (arm64-v8a) |
+| Device | Android 8.0+ (API 26), **ARM64** (arm64-v8a) or 32-bit ARM (armeabi-v7a, separate `-arm32` APK) |
 | Storage | ~1.2 GB free (the game's `Content` folder is ~1.1 GB) |
 | Game | **Celeste for PC, FNA build** (see below) |
 | Input | **Touch screen** (on-screen joystick + Jump/Dash/Grab/Pause buttons) or a game controller (Bluetooth or USB); the overlay hides itself when a controller is connected. |
@@ -59,12 +59,14 @@ scripts\build-natives-android.ps1
 scripts\build-release.ps1              # -> out\CelesteAndroid-<version>.apk
 ```
 
+32-bit ARM (armeabi-v7a): put the FMOD `armeabi-v7a` libs in `fmod\libs\android-arm\`, then run `scripts\build-natives-android.ps1 -Abi armeabi-v7a` and `scripts\build-release.ps1 -Abi armeabi-v7a` (-> `out\CelesteAndroid-<version>-arm32.apk`).
+
 Useful scripts:
 
 | Script | What it does |
 |---|---|
 | `scripts/build-natives-android.ps1` | Builds SDL3, FNA3D and FAudio for Android (NDK r27) |
-| `scripts/build-release.ps1` | Release APK. `-Personal` adds the official icon/logo taken from *your* game files; `-EmbedGame` puts your game inside the APK. **Personal APKs must never be shared.** |
+| `scripts/build-release.ps1` | Release APK (`-Abi armeabi-v7a` for the 32-bit build). `-Personal` adds the official icon/logo taken from *your* game files; `-EmbedGame` puts your game inside the APK. **Personal APKs must never be shared.** |
 | `scripts/deploy-android.ps1` | Development loop: patch, install the APK and push files over `adb` |
 | `scripts/fetch-fnalibs.ps1` | Downloads the x64 fnalibs for the desktop test host |
 | `scripts/generate-game-art.ps1` | Extracts the icon/key art from your game files (for personal builds) |

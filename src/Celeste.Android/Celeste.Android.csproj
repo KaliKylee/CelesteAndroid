@@ -8,7 +8,6 @@
 		<ApplicationTitle>Celeste</ApplicationTitle>
 		<ApplicationVersion>3</ApplicationVersion>
 		<ApplicationDisplayVersion>1.6.0</ApplicationDisplayVersion>
-		<RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>
 		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
 		<AndroidPackageFormat>apk</AndroidPackageFormat>
 		<PublishTrimmed>false</PublishTrimmed>
@@ -16,6 +15,17 @@
 		<RunAOTCompilation>false</RunAOTCompilation>
 		<AndroidEnableMarshalMethods>false</AndroidEnableMarshalMethods>
 		<NoWarn>$(NoWarn);CS8618;CS8625;CS8766;CS1572;BG8A04;BG8A00;BG8403</NoWarn>
+	</PropertyGroup>
+	<PropertyGroup>
+		<CelesteAbi Condition="'$(CelesteAbi)' == ''">arm64-v8a</CelesteAbi>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(CelesteAbi)' == 'armeabi-v7a'">
+		<RuntimeIdentifiers>android-arm</RuntimeIdentifiers>
+		<CelesteNativeDir>android-arm</CelesteNativeDir>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(CelesteAbi)' != 'armeabi-v7a'">
+		<RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>
+		<CelesteNativeDir>android-arm64</CelesteNativeDir>
 	</PropertyGroup>
 	<PropertyGroup>
 		<GameArtDir>$(MSBuildThisFileDirectory)GameArt\</GameArtDir>
@@ -28,9 +38,9 @@
 	<ItemGroup>
 		<AndroidJavaSource Include="$(RepoRoot)external\SDL\android-project\app\src\main\java\org\libsdl\app\*.java" Bind="true" />
 		<TransformFile Include="Transforms\Metadata.xml" />
-		<AndroidNativeLibrary Include="$(RepoRoot)natives\android-arm64\*.so" Abi="arm64-v8a" />
-		<AndroidNativeLibrary Include="$(RepoRoot)fmod\libs\android-arm64\*.so" Abi="arm64-v8a" />
-		<AndroidLibrary Include="$(RepoRoot)fmod\libs\android-arm64\fmod.jar" Bind="true" />
+		<AndroidNativeLibrary Include="$(RepoRoot)natives\$(CelesteNativeDir)\*.so" Abi="$(CelesteAbi)" />
+		<AndroidNativeLibrary Include="$(RepoRoot)fmod\libs\$(CelesteNativeDir)\*.so" Abi="$(CelesteAbi)" />
+		<AndroidLibrary Include="$(RepoRoot)fmod\libs\$(CelesteNativeDir)\fmod.jar" Bind="true" />
 	</ItemGroup>
 	<ItemGroup Condition="'$(HasGameIcon)' == 'true'">
 		<AndroidResource Include="$(GameArtDir)icon\res\**\*" Link="Resources\%(RecursiveDir)%(Filename)%(Extension)" />

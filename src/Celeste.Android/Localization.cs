@@ -579,6 +579,222 @@ namespace CelesteAndroid
 		public static string IconError => T(
 			"Não foi possível usar essa imagem", "Couldn't use that image", "No se pudo usar esa imagen", "この画像は使用できません", "Impossible d'utiliser cette image", "Impossibile usare questa immagine", "Dieses Bild kann nicht verwendet werden", "Не удалось использовать это изображение", "无法使用该图片", "이 이미지를 사용할 수 없습니다");
 
+		public static string SavesMenu => T(
+			"Saves",
+			"Saves",
+			"Partidas",
+			"セーブ",
+			"Sauvegardes",
+			"Salvataggi",
+			"Spielstände",
+			"Сохранения",
+			"存档",
+			"저장 데이터");
+
+		public static string SavesFromFolder => T(
+			"Importar de uma pasta",
+			"Import from a folder",
+			"Importar desde una carpeta",
+			"フォルダからインポート",
+			"Importer depuis un dossier",
+			"Importa da una cartella",
+			"Aus einem Ordner importieren",
+			"Импорт из папки",
+			"从文件夹导入",
+			"폴더에서 가져오기");
+
+		public static string SavesFromZip => T(
+			"Importar de um arquivo .zip",
+			"Import from a .zip file",
+			"Importar desde un archivo .zip",
+			".zipファイルからインポート",
+			"Importer depuis un fichier .zip",
+			"Importa da un file .zip",
+			"Aus einer .zip-Datei importieren",
+			"Импорт из .zip-файла",
+			"从 .zip 文件导入",
+			".zip 파일에서 가져오기");
+
+		public static string SavesExport => T(
+			"Exportar saves (.zip)",
+			"Export saves (.zip)",
+			"Exportar partidas (.zip)",
+			"セーブをエクスポート (.zip)",
+			"Exporter les sauvegardes (.zip)",
+			"Esporta i salvataggi (.zip)",
+			"Spielstände exportieren (.zip)",
+			"Экспорт сохранений (.zip)",
+			"导出存档 (.zip)",
+			"저장 데이터 내보내기 (.zip)");
+
+		public static string SavesRestore => T(
+			"Restaurar um backup",
+			"Restore a backup",
+			"Restaurar una copia de seguridad",
+			"バックアップから復元",
+			"Restaurer un backup",
+			"Ripristina un backup",
+			"Backup wiederherstellen",
+			"Восстановить резервную копию",
+			"恢复备份",
+			"백업 복원");
+
+		public static string SavesConfirmTitle => T(
+			"Importar estes saves?",
+			"Import these saves?",
+			"¿Importar estas partidas?",
+			"このセーブをインポートしますか？",
+			"Importer ces sauvegardes ?",
+			"Importare questi salvataggi?",
+			"Diese Spielstände importieren?",
+			"Импортировать эти сохранения?",
+			"导入这些存档？",
+			"이 저장 데이터를 가져올까요?");
+
+		public static string SaveNew => T(
+			"novo",
+			"new",
+			"nuevo",
+			"新規",
+			"nouveau",
+			"nuovo",
+			"neu",
+			"новое",
+			"新建",
+			"새 항목");
+
+		public static string SaveReplace => T(
+			"substitui o atual",
+			"replaces current",
+			"reemplaza el actual",
+			"現在のものを置き換え",
+			"remplace l'actuel",
+			"sostituisce l'attuale",
+			"ersetzt den aktuellen",
+			"заменит текущее",
+			"替换当前存档",
+			"현재 항목을 덮어씀");
+
+		public static string SavesConfirmNote => T(
+			"Os saves atuais serão guardados em um backup antes de serem substituídos.",
+			"Your current saves will be backed up before being replaced.",
+			"Tus partidas actuales se guardarán en una copia antes de reemplazarlas.",
+			"置き換える前に、現在のセーブはバックアップされます。",
+			"Vos sauvegardes actuelles seront copiées dans un backup avant d'être remplacées.",
+			"I salvataggi attuali verranno salvati in un backup prima di essere sostituiti.",
+			"Deine aktuellen Spielstände werden vor dem Ersetzen gesichert.",
+			"Текущие сохранения будут скопированы в резервную копию перед заменой.",
+			"替换前会先备份当前存档。",
+			"교체하기 전에 현재 저장 데이터를 백업합니다.");
+
+		public static string SavesImportBtn => T(
+			"Importar",
+			"Import",
+			"Importar",
+			"インポート",
+			"Importer",
+			"Importa",
+			"Importieren",
+			"Импортировать",
+			"导入",
+			"가져오기");
+
+		public static string SavesExported(int n) => T(
+			$"✓  {n} save(s) exportado(s)",
+			$"✓  {n} save file(s) exported",
+			$"✓  {n} partida(s) exportada(s)",
+			$"✓  セーブを{n}件エクスポートしました",
+			$"✓  {n} sauvegarde(s) exportée(s)",
+			$"✓  {n} salvataggio/i esportato/i",
+			$"✓  {n} Spielstand/-stände exportiert",
+			$"✓  Экспортировано сохранений: {n}",
+			$"✓  已导出 {n} 个存档",
+			$"✓  저장 데이터 {n}개를 내보냈습니다");
+
+		public static string NoLocalSaves => T(
+			"Ainda não há saves no app para exportar",
+			"There are no saves in the app to export yet",
+			"Aún no hay partidas en la app para exportar",
+			"エクスポートできるセーブがまだありません",
+			"Il n'y a pas encore de sauvegarde à exporter",
+			"Non ci sono ancora salvataggi da esportare",
+			"Es gibt noch keine Spielstände zum Exportieren",
+			"Пока нет сохранений для экспорта",
+			"应用中还没有可导出的存档",
+			"내보낼 저장 데이터가 아직 없습니다");
+
+		public static string NoBackups => T(
+			"Nenhum backup encontrado",
+			"No backups found",
+			"No se encontró ninguna copia de seguridad",
+			"バックアップが見つかりません",
+			"Aucun backup trouvé",
+			"Nessun backup trovato",
+			"Keine Backups gefunden",
+			"Резервные копии не найдены",
+			"未找到备份",
+			"백업을 찾을 수 없습니다");
+
+		public static string SavesPickBackup => T(
+			"Escolha um backup",
+			"Choose a backup",
+			"Elige una copia de seguridad",
+			"バックアップを選択",
+			"Choisissez un backup",
+			"Scegli un backup",
+			"Backup auswählen",
+			"Выберите резервную копию",
+			"选择备份",
+			"백업 선택");
+
+		public static string SavesRestored(int n) => T(
+			$"✓  Backup restaurado ({n} arquivo(s))",
+			$"✓  Backup restored ({n} file(s))",
+			$"✓  Copia restaurada ({n} archivo(s))",
+			$"✓  バックアップを復元しました（{n}件）",
+			$"✓  Backup restauré ({n} fichier(s))",
+			$"✓  Backup ripristinato ({n} file)",
+			$"✓  Backup wiederhergestellt ({n} Datei(en))",
+			$"✓  Резервная копия восстановлена (файлов: {n})",
+			$"✓  已恢复备份（{n} 个文件）",
+			$"✓  백업을 복원했습니다 ({n}개 파일)");
+
+		public static string SavesSkipped(string names) => T(
+			$"Ignorados (inválidos): {names}",
+			$"Skipped (invalid): {names}",
+			$"Omitidos (no válidos): {names}",
+			$"スキップ（無効）: {names}",
+			$"Ignorés (invalides) : {names}",
+			$"Ignorati (non validi): {names}",
+			$"Übersprungen (ungültig): {names}",
+			$"Пропущены (повреждены): {names}",
+			$"已跳过（无效）：{names}",
+			$"건너뜀(잘못된 파일): {names}");
+
+		public static string SavesCount(int n) => T(
+			$"{n} save(s)",
+			$"{n} save(s)",
+			$"{n} partida(s)",
+			$"{n}件",
+			$"{n} sauvegarde(s)",
+			$"{n} salvataggio/i",
+			$"{n} Spielstand/-stände",
+			$"{n} сохр.",
+			$"{n} 个存档",
+			$"{n}개");
+
+		public static string SavesWorking => T(
+			"Processando saves…",
+			"Working on saves…",
+			"Procesando partidas…",
+			"セーブを処理中…",
+			"Traitement des sauvegardes…",
+			"Elaborazione dei salvataggi…",
+			"Spielstände werden verarbeitet…",
+			"Обработка сохранений…",
+			"正在处理存档…",
+			"저장 데이터 처리 중…");
+
 		public static string[] ControlNames => V(
 			new[] { "Analógico", "Pular", "Dash", "Agarrar", "Pausar", "Tab" },
 			new[] { "Stick", "Jump", "Dash", "Grab", "Pause", "Tab" },

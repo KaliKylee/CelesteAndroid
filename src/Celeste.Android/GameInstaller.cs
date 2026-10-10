@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -97,7 +98,77 @@ namespace CelesteAndroid
 			CopyAll(files.Select(f => (f[(GameAssetsRoot.Length + 1)..], -1L, (Func<Stream>)(() => context.Assets!.Open(f)))));
 		}
 
-		public int ImportSaves(Uri treeUri)
+		// ---------- Saves: importar (pasta ou .zip), exportar (.zip) e backups com data ----------
+
+		private const int MaxBackups = 10;
+		private const long MaxSaveBytes = 20L << 20;
+
+		public sealed class SavePlan
+		{
+			public List<(string Name, byte[] Data, bool Replaces)> Files { get; } = new();
+			public List<string> Skipped { get; } = new();
+		}
+
+		private static string SavesDir(Context c) => Path.Combine(UserDir(c), "Celeste", "Saves");
+
+		private static string BackupsDir(Context c) => Path.Combine(UserDir(c), "Celeste", "Backups");
+
+		private static byte[] ReadAll(Stream input)
+		{
+			using var ms = new MemoryStream();
+			input.CopyTo(ms);
+			return ms.ToArray();
+		}
+
+		// Um save válido é um XML bem formado (formato usado pelo Celeste).
+		private static bool LooksLikeSave(byte[] data)
+		{
+			if (data.Length == 0 || data.Length > MaxSaveBytes)
+				return false;
+			try
+			{
+				using var ms = new MemoryStream(data);
+				return System.Xml.Linq.XDocument.Load(ms).Root != null;
+			}
+			catch (Exception)
+			{
+				return false;
+			}
+		}
+
+		private SavePlan BuildPlan(IEnumerable<(string name, Func<byte[]> read)> candidates)
+		{
+			var plan = new SavePlan();
+			string target = SavesDir(context);
+			var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			foreach (var (rawName, read) in candidates)
+			{
+				string name = Path.GetFileName(rawName);
+				if (name.Length == 0 || name.Contains("..", StringComparison.Ordinal) || !seen.Add(name))
+					continue;
+				byte[] data;
+				try
+				{
+					data = read();
+				}
+				catch (Exception)
+				{
+					plan.Skipped.Add(name);
+					continue;
+				}
+				if (!LooksLikeSave(data))
+				{
+					plan.Skipped.Add(name);
+					continue;
+				}
+				plan.Files.Add((name, data, File.Exists(Path.Combine(target, name))));
+			}
+			if (plan.Files.Count == 0)
+				throw new InstallException(plan.Skipped.Count > 0 ? L.SavesSkipped(string.Join(", ", plan.Skipped)) : L.NoSaves);
+			return plan;
+		}
+
+		public SavePlan ReadSavesFolder(Uri treeUri)
 		{
 			progress(L.SearchingSaves, -1);
 			string rootId = DocumentsContract.GetTreeDocumentId(treeUri)!;
@@ -109,20 +180,162 @@ namespace CelesteAndroid
 			if (saves.Count == 0)
 				throw new InstallException(L.NoSaves);
 
-			string target = Path.Combine(UserDir(context), "Celeste", "Saves");
-			string backup = Path.Combine(UserDir(context), "Celeste", "Backups");
-			Directory.CreateDirectory(target);
-			Directory.CreateDirectory(backup);
-			foreach (string existing in Directory.GetFiles(target, "*.celeste"))
-				File.Copy(existing, Path.Combine(backup, Path.GetFileName(existing)), overwrite: true);
-
-			foreach (Doc save in saves)
+			return BuildPlan(saves.Select(save => (save.Name, (Func<byte[]>)(() =>
 			{
+				if (save.Size > MaxSaveBytes)
+					return Array.Empty<byte>();
 				using Stream input = context.ContentResolver!.OpenInputStream(DocumentsContract.BuildDocumentUriUsingTree(treeUri, save.Id)!)!;
-				using FileStream output = File.Create(Path.Combine(target, save.Name));
-				input.CopyTo(output);
+				return ReadAll(input);
+			}))));
+		}
+
+		public SavePlan ReadSavesZip(Uri zipUri)
+		{
+			progress(L.SearchingSaves, -1);
+			using var pfd = context.ContentResolver!.OpenFileDescriptor(zipUri, "r")
+				?? throw new InstallException(L.CantOpenFile);
+			using var stream = new FileStream(new SafeFileHandle(pfd.DetachFd(), ownsHandle: true), FileAccess.Read);
+			using var zip = new ZipArchive(stream, ZipArchiveMode.Read);
+
+			List<ZipArchiveEntry> entries = zip.Entries
+				.Where(e => e.Name.EndsWith(".celeste", StringComparison.OrdinalIgnoreCase))
+				.ToList();
+			if (entries.Count == 0)
+				throw new InstallException(L.NoSaves);
+
+			return BuildPlan(entries.Select(e => (e.Name, (Func<byte[]>)(() =>
+			{
+				if (e.Length > MaxSaveBytes)
+					return Array.Empty<byte>();
+				using Stream input = e.Open();
+				return ReadAll(input);
+			}))));
+		}
+
+		public int ApplySaves(SavePlan plan)
+		{
+			progress(L.SavesWorking, -1);
+			Directory.CreateDirectory(SavesDir(context));
+			BackupCurrentSaves();
+			WriteSaves(plan.Files.Select(f => (f.Name, f.Data)).ToList());
+			return plan.Files.Count;
+		}
+
+		private void WriteSaves(List<(string Name, byte[] Data)> files)
+		{
+			string target = SavesDir(context);
+			Directory.CreateDirectory(target);
+			foreach (var (name, data) in files)
+			{
+				string dest = Path.Combine(target, name);
+				string tmp = dest + ".tmp";
+				File.WriteAllBytes(tmp, data);
+				File.Move(tmp, dest, overwrite: true);
 			}
-			return saves.Count;
+		}
+
+		private string NewBackupDir(DateTime time)
+		{
+			string root = BackupsDir(context);
+			Directory.CreateDirectory(root);
+			string name = time.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+			string dir = Path.Combine(root, name);
+			int n = 1;
+			while (Directory.Exists(dir))
+				dir = Path.Combine(root, name + "-" + n++);
+			Directory.CreateDirectory(dir);
+			return dir;
+		}
+
+		// Guarda os saves atuais numa pasta com data/hora e mantém só os últimos backups.
+		private void BackupCurrentSaves()
+		{
+			string target = SavesDir(context);
+			if (!Directory.Exists(target))
+				return;
+			string[] current = Directory.GetFiles(target, "*.celeste");
+			if (current.Length == 0)
+				return;
+			string dir = NewBackupDir(DateTime.Now);
+			foreach (string file in current)
+				File.Copy(file, Path.Combine(dir, Path.GetFileName(file)), overwrite: true);
+
+			string[] all = Directory.GetDirectories(BackupsDir(context));
+			Array.Sort(all, StringComparer.Ordinal);
+			for (int i = 0; i < all.Length - MaxBackups; i++)
+				Directory.Delete(all[i], recursive: true);
+		}
+
+		public static List<(string Name, DateTime Time, int Count)> ListBackups(Context c)
+		{
+			var result = new List<(string, DateTime, int)>();
+			string root = BackupsDir(c);
+			if (!Directory.Exists(root))
+				return result;
+
+			// Backups antigos ficavam soltos na pasta: agrupa numa pasta datada.
+			string[] flat = Directory.GetFiles(root, "*.celeste");
+			if (flat.Length > 0)
+			{
+				DateTime when = flat.Max(f => File.GetLastWriteTime(f));
+				string name = when.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+				string dir = Path.Combine(root, name);
+				int n = 1;
+				while (Directory.Exists(dir))
+					dir = Path.Combine(root, name + "-" + n++);
+				Directory.CreateDirectory(dir);
+				foreach (string file in flat)
+					File.Move(file, Path.Combine(dir, Path.GetFileName(file)));
+			}
+
+			string[] dirs = Directory.GetDirectories(root);
+			Array.Sort(dirs, StringComparer.Ordinal);
+			for (int i = dirs.Length - 1; i >= 0; i--)
+			{
+				int count = Directory.GetFiles(dirs[i], "*.celeste").Length;
+				if (count > 0)
+					result.Add((Path.GetFileName(dirs[i]), Directory.GetLastWriteTime(dirs[i]), count));
+			}
+			return result;
+		}
+
+		public int RestoreBackup(string name)
+		{
+			progress(L.SavesWorking, -1);
+			string dir = Path.Combine(BackupsDir(context), Path.GetFileName(name));
+			string[] files = Directory.Exists(dir) ? Directory.GetFiles(dir, "*.celeste") : Array.Empty<string>();
+			if (files.Length == 0)
+				throw new InstallException(L.NoBackups);
+
+			// Lê tudo antes: o backup dos saves atuais pode apagar o mais antigo da lista.
+			var data = files.Select(f => (Path.GetFileName(f), File.ReadAllBytes(f))).ToList();
+			BackupCurrentSaves();
+			WriteSaves(data);
+			return data.Count;
+		}
+
+		public int ExportSaves(Uri uri)
+		{
+			progress(L.SavesWorking, -1);
+			string dir = SavesDir(context);
+			string[] files = Directory.Exists(dir) ? Directory.GetFiles(dir, "*.celeste") : Array.Empty<string>();
+			if (files.Length == 0)
+				throw new InstallException(L.NoLocalSaves);
+
+			using Stream output = context.ContentResolver!.OpenOutputStream(uri, "wt")
+				?? throw new InstallException(L.CantOpenFile);
+			using (var zip = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
+			{
+				foreach (string file in files)
+				{
+					ZipArchiveEntry entry = zip.CreateEntry("Saves/" + Path.GetFileName(file), CompressionLevel.Optimal);
+					using Stream entryStream = entry.Open();
+					using FileStream input = File.OpenRead(file);
+					input.CopyTo(entryStream);
+				}
+			}
+			output.Flush();
+			return files.Length;
 		}
 
 		private void CheckFnaBuild(bool hasFna)

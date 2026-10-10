@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using Android.App;
 using Android.Content;
@@ -31,6 +32,8 @@ namespace CelesteAndroid
 		private const int RequestFolder = 1;
 		private const int RequestZip = 2;
 		private const int RequestSaves = 3;
+		private const int RequestSavesZip = 4;
+		private const int RequestSavesExport = 5;
 
 		private static readonly Color Night = Color.ParseColor("#120C22");
 		private static readonly Color Accent = Color.ParseColor("#F2B8D8");
@@ -146,8 +149,8 @@ namespace CelesteAndroid
 			links = new LinearLayout(this) { Orientation = Orientation.Horizontal };
 			openZip = LinkText(L.ImportZip);
 			openZip.Click += (_, _) => PickZip();
-			importSaves = LinkText(L.ImportSaves);
-			importSaves.Click += (_, _) => StartActivityForResult(new Intent(Intent.ActionOpenDocumentTree), RequestSaves);
+			importSaves = LinkText(L.SavesMenu);
+			importSaves.Click += (_, _) => ShowSavesMenu();
 			driverToggle = LinkText("");
 			driverToggle.Click += (_, _) => ToggleDriver();
 			links.AddView(openZip);
@@ -325,7 +328,7 @@ namespace CelesteAndroid
 			byline.Text = L.PortBy + " Kali Kyle";
 			play.Text = L.Play;
 			openZip.Text = L.ImportZip;
-			importSaves.Text = L.ImportSaves;
+			importSaves.Text = L.SavesMenu;
 			optionsButton.Text = $"⚙  {L.Options}  ▾";
 			langButton.Text = $"{L.Flag(L.Current)}  {L.Name(L.Current)}  ▾";
 			play.Enabled = installed && !busy;
@@ -391,7 +394,11 @@ namespace CelesteAndroid
 			else if (requestCode == RequestZip)
 				RunInstall(installer => installer.ImportZip(uri));
 			else if (requestCode == RequestSaves)
-				RunJob(installer => L.SavesImported(installer.ImportSaves(uri)));
+				PrepareSaves(installer => installer.ReadSavesFolder(uri));
+			else if (requestCode == RequestSavesZip)
+				PrepareSaves(installer => installer.ReadSavesZip(uri));
+			else if (requestCode == RequestSavesExport)
+				RunJob(installer => L.SavesExported(installer.ExportSaves(uri)));
 		}
 
 		private void RunInstall(Action<GameInstaller> import)
@@ -406,19 +413,130 @@ namespace CelesteAndroid
 			});
 		}
 
+		private GameInstaller NewInstaller() => new GameInstaller(this, (message, fraction) => RunOnUiThread(() =>
+		{
+			progressText.Text = message;
+			progressBar.Indeterminate = fraction < 0;
+			if (fraction >= 0)
+				progressBar.Progress = (int)(fraction * 1000);
+		}));
+
+		private void ShowSavesMenu()
+		{
+			string[] items = { L.SavesFromFolder, L.SavesFromZip, L.SavesExport, L.SavesRestore };
+			new AlertDialog.Builder(this)!
+				.SetTitle(L.SavesMenu)!
+				.SetItems(items, (_, e) =>
+				{
+					switch (e.Which)
+					{
+						case 0:
+							StartActivityForResult(new Intent(Intent.ActionOpenDocumentTree), RequestSaves);
+							break;
+						case 1:
+							var open = new Intent(Intent.ActionOpenDocument);
+							open.AddCategory(Intent.CategoryOpenable);
+							open.SetType("*/*");
+							open.PutExtra(Intent.ExtraMimeTypes, new[] { "application/zip", "application/x-zip-compressed" });
+							StartActivityForResult(open, RequestSavesZip);
+							break;
+						case 2:
+							var create = new Intent(Intent.ActionCreateDocument);
+							create.AddCategory(Intent.CategoryOpenable);
+							create.SetType("application/zip");
+							create.PutExtra(Intent.ExtraTitle, "celeste-saves-" + DateTime.Now.ToString("yyyyMMdd-HHmm", System.Globalization.CultureInfo.InvariantCulture) + ".zip");
+							StartActivityForResult(create, RequestSavesExport);
+							break;
+						default:
+							ShowBackups();
+							break;
+					}
+				})!
+				.Show();
+		}
+
+		private void ShowBackups()
+		{
+			var backups = GameInstaller.ListBackups(this);
+			if (backups.Count == 0)
+			{
+				Toast.MakeText(this, L.NoBackups, ToastLength.Long)?.Show();
+				return;
+			}
+			string[] labels = backups.Select(b => b.Time.ToString("g") + "  ·  " + L.SavesCount(b.Count)).ToArray();
+			new AlertDialog.Builder(this)!
+				.SetTitle(L.SavesPickBackup)!
+				.SetItems(labels, (_, e) =>
+				{
+					string name = backups[e.Which].Name;
+					RunJob(installer => L.SavesRestored(installer.RestoreBackup(name)));
+				})!
+				.Show();
+		}
+
+		// Lê e valida os saves em segundo plano; só importa depois que o usuário confirmar.
+		private void PrepareSaves(Func<GameInstaller, GameInstaller.SavePlan> read)
+		{
+			busy = true;
+			progressBox.Visibility = ViewStates.Visible;
+			RefreshState();
+			GameInstaller installer = NewInstaller();
+
+			new Thread(() =>
+			{
+				GameInstaller.SavePlan? plan = null;
+				string? error = null;
+				try
+				{
+					plan = read(installer);
+				}
+				catch (InstallException e)
+				{
+					error = e.Message;
+				}
+				catch (Exception e)
+				{
+					Log.Error(GameActivity.LogTag, e.ToString());
+					error = L.SomethingWrong(e.Message);
+				}
+
+				RunOnUiThread(() =>
+				{
+					busy = false;
+					progressBox.Visibility = ViewStates.Gone;
+					RefreshState();
+					if (plan == null)
+						status.Text = error;
+					else
+						ConfirmSaves(plan);
+				});
+			}) { Name = "CelesteSaves", IsBackground = true }.Start();
+		}
+
+		private void ConfirmSaves(GameInstaller.SavePlan plan)
+		{
+			var sb = new System.Text.StringBuilder();
+			foreach (var file in plan.Files)
+				sb.Append("• ").Append(file.Name).Append(" — ").Append(file.Replaces ? L.SaveReplace : L.SaveNew).Append('\n');
+			if (plan.Skipped.Count > 0)
+				sb.Append('\n').Append(L.SavesSkipped(string.Join(", ", plan.Skipped))).Append('\n');
+			sb.Append('\n').Append(L.SavesConfirmNote);
+
+			new AlertDialog.Builder(this)!
+				.SetTitle(L.SavesConfirmTitle)!
+				.SetMessage(sb.ToString())!
+				.SetPositiveButton(L.SavesImportBtn, (_, _) => RunJob(installer => L.SavesImported(installer.ApplySaves(plan))))!
+				.SetNegativeButton(L.Cancel, (_, _) => { })!
+				.Show();
+		}
+
 		private void RunJob(Func<GameInstaller, string> job)
 		{
 			busy = true;
 			progressBox.Visibility = ViewStates.Visible;
 			RefreshState();
 
-			var installer = new GameInstaller(this, (message, fraction) => RunOnUiThread(() =>
-			{
-				progressText.Text = message;
-				progressBar.Indeterminate = fraction < 0;
-				if (fraction >= 0)
-					progressBar.Progress = (int)(fraction * 1000);
-			}));
+			GameInstaller installer = NewInstaller();
 
 			new Thread(() =>
 			{

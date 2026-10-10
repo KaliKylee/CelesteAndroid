@@ -552,6 +552,33 @@ namespace CelesteAndroid
 		public static string TabIcon => T(
 			"Ícone", "Icon", "Icono", "アイコン", "Icône", "Icona", "Symbol", "Значок", "图标", "아이콘");
 
+		public static string TabButton => T(
+			"Botão", "Button", "Botón", "ボタン", "Bouton", "Pulsante", "Taste", "Кнопка", "按钮", "버튼");
+
+		public static string ButtonAction => T(
+			"Ação", "Action", "Acción", "動作", "Action", "Azione", "Aktion", "Действие", "操作", "동작");
+
+		public static string GamepadButton => T(
+			"Botão do gamepad", "Gamepad button", "Botón del mando", "ゲームパッドのボタン", "Bouton de manette", "Pulsante del gamepad", "Gamepad-Taste", "Кнопка геймпада", "手柄按键", "게임패드 버튼");
+
+		public static string ButtonText => T(
+			"Texto", "Text", "Texto", "テキスト", "Texte", "Testo", "Text", "Текст", "文字", "텍스트");
+
+		public static string TextAuto => T(
+			"Auto", "Auto", "Auto", "自動", "Auto", "Auto", "Auto", "Авто", "自动", "자동");
+
+		public static string SelectCustomNote => T(
+			"Toque em Adicionar, ou selecione um botão criado por você, para editar ação, texto e cor.",
+			"Tap Add, or select a button you created, to edit its action, text and color.",
+			"Pulsa Añadir, o selecciona un botón creado por ti, para editar acción, texto y color.",
+			"「追加」をタップするか、作成したボタンを選ぶと、動作・テキスト・色を編集できます。",
+			"Touchez Ajouter, ou sélectionnez un bouton créé, pour modifier action, texte et couleur.",
+			"Tocca Aggiungi, o seleziona un pulsante creato da te, per modificare azione, testo e colore.",
+			"Tippe auf Hinzufügen oder wähle eine eigene Taste, um Aktion, Text und Farbe zu ändern.",
+			"Нажмите «Добавить» или выберите свою кнопку, чтобы изменить действие, текст и цвет.",
+			"点按“添加按钮”，或选择自己创建的按钮，即可编辑操作、文字和颜色。",
+			"추가를 누르거나 직접 만든 버튼을 선택해 동작, 텍스트, 색상을 편집하세요.");
+
 		public static string TabMore => T(
 			"Mais", "More", "Más", "その他", "Plus", "Altro", "Mehr", "Ещё", "更多", "더보기");
 

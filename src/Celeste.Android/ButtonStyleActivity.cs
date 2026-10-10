@@ -25,7 +25,8 @@ namespace CelesteAndroid
 
 	public class CustomButton
 	{
-		public string Key = "-";
+		public string Key = "pad:A";   // "pad:<botão do gamepad>", nome do enum Keys, ou "-" = nenhuma
+		public string? Text;           // texto do botão (null = automático, a partir da ação)
 		public int Rgb = 0x4DA3FF;
 		public int Opacity = -1;   // -1 = opacidade geral
 		public float X = 50f, Y = 50f; // % da tela
@@ -52,7 +53,7 @@ namespace CelesteAndroid
 					if (kv.Length != 2 || !kv[0].Trim().StartsWith("c", StringComparison.Ordinal))
 						continue;
 					string[] v = kv[1].Split(',');
-					if ((v.Length != 6 && v.Length != 9) || list.Count >= Max)
+					if ((v.Length != 6 && v.Length != 9 && v.Length != 10) || list.Count >= Max)
 						continue;
 					int I(string t, int d) => int.TryParse(t.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int r) ? r : d;
 					float Fl(string t, float d) => float.TryParse(t.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float r) ? r : d;
@@ -65,9 +66,10 @@ namespace CelesteAndroid
 						X = Math.Clamp(Fl(v[3], 50f), 0f, 100f),
 						Y = Math.Clamp(Fl(v[4], 50f), 0f, 100f),
 						Size = Math.Clamp(I(v[5], 100), 40, 250),
-						Shape = v.Length == 9 ? Math.Clamp(I(v[6], 0), 0, 2) : 0,
-						HSize = v.Length == 9 ? Math.Clamp(I(v[7], -1), 40, 250) : -1,
-						Icon = v.Length == 9 && v[8].Trim().Length > 0 && v[8].Trim() != "-" ? v[8].Trim() : null,
+						Shape = v.Length >= 9 ? Math.Clamp(I(v[6], 0), 0, 2) : 0,
+						HSize = v.Length >= 9 ? Math.Clamp(I(v[7], -1), 40, 250) : -1,
+						Icon = v.Length >= 9 && v[8].Trim().Length > 0 && v[8].Trim() != "-" ? v[8].Trim() : null,
+						Text = v.Length == 10 ? PixelButtonArt.CleanLabel(v[9]) : null,
 					});
 				}
 			}
@@ -92,8 +94,11 @@ namespace CelesteAndroid
 				sb.Append('c').Append(i + 1).Append('=').Append(b.Key).Append(',').Append(b.Rgb.ToString("X6", CultureInfo.InvariantCulture)).Append(',')
 					.Append(b.Opacity.ToString(CultureInfo.InvariantCulture)).Append(',').Append(b.X.ToString("0.##", CultureInfo.InvariantCulture)).Append(',')
 					.Append(b.Y.ToString("0.##", CultureInfo.InvariantCulture)).Append(',').Append(b.Size.ToString(CultureInfo.InvariantCulture));
-				if (b.Shape != 0 || b.Icon != null)
+				string? text = PixelButtonArt.CleanLabel(b.Text);
+				if (b.Shape != 0 || b.Icon != null || text != null)
 					sb.Append(',').Append(b.Shape.ToString(CultureInfo.InvariantCulture)).Append(',').Append((b.HSize > 0 ? b.HSize : b.Size).ToString(CultureInfo.InvariantCulture)).Append(',').Append(b.Icon ?? "-");
+				if (text != null)
+					sb.Append(',').Append(text);
 				sb.Append('\n');
 			}
 			File.WriteAllText(path, sb.ToString());
@@ -199,6 +204,7 @@ namespace CelesteAndroid
 		public static string Display(string key) => key switch
 		{
 			"-" => L.NoKey,
+			_ when key.StartsWith("pad:", StringComparison.Ordinal) => "🎮 " + PixelButtonArt.PadName(key.Substring(4)),
 			_ when key.Length == 2 && key[0] == 'D' && char.IsDigit(key[1]) => key.Substring(1),
 			_ => key,
 		};
@@ -217,7 +223,7 @@ namespace CelesteAndroid
 		private static readonly Color Night = Color.ParseColor("#120C22");
 		private static readonly Color Accent = Color.ParseColor("#F2B8D8");
 
-		private static readonly string[] Palette =
+		internal static readonly string[] Palette =
 		{
 			"FFFFFF", "FF4D4D", "FF9A3C", "FFD93D", "6BE675", "3CD6C8", "4DA3FF", "8A6BFF", "E070FF", "FF7EB6", "9AA0A6", "222222",
 		};
@@ -333,10 +339,13 @@ namespace CelesteAndroid
 			var row1 = new LinearLayout(this) { Orientation = Orientation.Horizontal };
 			row1.SetGravity(GravityFlags.CenterVertical);
 			row1.AddView(Text("#" + (idx + 1), 16, Accent, true), new LinearLayout.LayoutParams(Dp(90), -2));
-			row1.AddView(Text(L.KeyboardKey + ":", 13, Color.White, false), new LinearLayout.LayoutParams(-2, -2));
+			row1.AddView(Text(L.ButtonAction + ":", 13, Color.White, false), new LinearLayout.LayoutParams(-2, -2));
 			var keyBtn = MakeButton(ButtonStyles.Display(cb.Key), false);
-			keyBtn.Click += (_, _) => PickKey(cb.Key, key => { cb.Key = key; keyBtn.Text = ButtonStyles.Display(key); });
+			keyBtn.Click += (_, _) => ActionPicker.Show(this, cb.Key, key => { cb.Key = key; keyBtn.Text = ButtonStyles.Display(key); }, HideSystemBars);
 			row1.AddView(keyBtn, new LinearLayout.LayoutParams(Dp(130), Dp(34)) { LeftMargin = Dp(8) });
+			var textBtn = MakeButton(L.ButtonText + ": " + (cb.Text ?? L.TextAuto), false);
+			textBtn.Click += (_, _) => ActionPicker.ShowText(this, cb.Text, t => { cb.Text = t; textBtn.Text = L.ButtonText + ": " + (cb.Text ?? L.TextAuto); }, HideSystemBars);
+			row1.AddView(textBtn, new LinearLayout.LayoutParams(Dp(110), Dp(34)) { LeftMargin = Dp(6) });
 			var spacer = new View(this);
 			row1.AddView(spacer, new LinearLayout.LayoutParams(0, 1, 1f));
 			var del = MakeButton("🗑  " + L.RemoveButton, false);
@@ -550,7 +559,7 @@ namespace CelesteAndroid
 			return card;
 		}
 
-		private static readonly string[] KeyList = BuildKeyList();
+		internal static readonly string[] KeyList = BuildKeyList();
 
 		private static string[] BuildKeyList()
 		{

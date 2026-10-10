@@ -42,7 +42,33 @@ namespace CelesteAndroid
 
 		public static string ButtonStyleFile(Context context) => Path.Combine(Files(context), "button_style.txt");
 
-		public static bool IsInstalled(Context context) =>
+		private static string PatchStampFile(Context context) => Path.Combine(Files(context), "patched", "patch.stamp");
+
+		// Impressão digital do módulo de patches embutido no APK. Muda a cada versão que altera os patches.
+		private static string CurrentPatchStamp(Context context)
+		{
+			using Stream s = context.Assets!.Open("patcher/Celeste.Android.mm.dll");
+			using var sha = System.Security.Cryptography.SHA256.Create();
+			return Convert.ToHexString(sha.ComputeHash(s));
+		}
+
+		// O Celeste.dll "patchado" é gerado no aparelho; depois de atualizar o app ele precisa ser refeito.
+		public static bool NeedsRepatch(Context context)
+		{
+			try
+			{
+				if (!IsInstalled(context))
+					return false;
+				string stamp = PatchStampFile(context);
+				return !File.Exists(stamp) || File.ReadAllText(stamp).Trim() != CurrentPatchStamp(context);
+			}
+			catch (Exception)
+			{
+				return false;
+			}
+		}
+
+		public static bool IsInstalled(Context context) =
 			File.Exists(PatchedDll(context)) && Directory.Exists(Path.Combine(GameDir(context), "Content"));
 
 		public static bool HasEmbeddedGame(Context context) =>
@@ -411,6 +437,7 @@ namespace CelesteAndroid
 				msg => Log.Info(GameActivity.LogTag, msg)
 			);
 			File.Move(staging, patched, overwrite: true);
+			File.WriteAllText(PatchStampFile(context), CurrentPatchStamp(context));
 			foreach (string leftover in Directory.GetFiles(Path.GetDirectoryName(patched)!, "*.mdb"))
 				File.Delete(leftover);
 		}

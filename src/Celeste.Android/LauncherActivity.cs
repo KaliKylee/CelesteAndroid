@@ -89,6 +89,8 @@ namespace CelesteAndroid
 			art.StartAnimation(zoom);
 		}
 
+		private static bool repatchTried;
+
 		protected override void OnResume()
 		{
 			base.OnResume();
@@ -103,6 +105,12 @@ namespace CelesteAndroid
 			else if (!busy && !GameInstaller.IsInstalled(this) && GameInstaller.HasEmbeddedGame(this))
 			{
 				RunInstall(installer => installer.ImportEmbedded());
+			}
+			else if (!busy && !repatchTried && GameInstaller.NeedsRepatch(this))
+			{
+				// App atualizado: refaz o patch para o jogo usar o código novo (controles etc.).
+				repatchTried = true;
+				RunInstall(_ => { });
 			}
 		}
 

@@ -43,6 +43,10 @@ namespace CelesteAndroid
 		private LinearLayout shapeBox = null!, iconBox = null!;
 		private TextView shapeNote = null!, iconNote = null!;
 		private Button defaultIconButton = null!;
+		private Button addButton = null!, removeButton = null!, actionButton = null!, textButton = null!;
+		private LinearLayout customBox = null!;
+		private TextView customNote = null!;
+		private readonly List<View> swatchViews = new();
 		private int pickTarget = -1;
 
 		public override ScreenOrientation RequestedOrientation
@@ -134,7 +138,7 @@ namespace CelesteAndroid
 			bar.AddView(header, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
 
 			var tabRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-			string[] tabNames = { L.TabSize, L.TabShape, L.TabIcon, L.TabMore };
+			string[] tabNames = { L.TabSize, L.TabShape, L.TabIcon, L.TabButton, L.TabMore };
 			for (int k = 0; k < tabNames.Length; k++)
 			{
 				int tab = k;
@@ -148,6 +152,7 @@ namespace CelesteAndroid
 			sections.Add(BuildSizeSection());
 			sections.Add(BuildShapeSection());
 			sections.Add(BuildIconSection());
+			sections.Add(BuildButtonSection());
 			sections.Add(BuildMoreSection());
 			var holder = new FrameLayout(this);
 			foreach (View section in sections)
@@ -241,6 +246,78 @@ namespace CelesteAndroid
 			return box;
 		}
 
+		private View BuildButtonSection()
+		{
+			var box = new LinearLayout(this) { Orientation = Orientation.Vertical };
+
+			var topRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+			addButton = MakeButton("＋  " + L.AddButton, filled: true);
+			addButton.Click += (_, _) =>
+			{
+				if (!canvas.AddCustom())
+					return;
+				UpdateBar();
+			};
+			removeButton = MakeButton("🗑  " + L.RemoveButton, filled: false);
+			removeButton.Click += (_, _) =>
+			{
+				canvas.RemoveSelectedCustom();
+				UpdateBar();
+			};
+			topRow.AddView(addButton, new LinearLayout.LayoutParams(0, Dp(36), 1f));
+			topRow.AddView(removeButton, new LinearLayout.LayoutParams(0, Dp(36), 1f) { LeftMargin = Dp(6) });
+			box.AddView(topRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+			customBox = new LinearLayout(this) { Orientation = Orientation.Vertical };
+			var rowA = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+			actionButton = MakeButton("", filled: false);
+			actionButton.Click += (_, _) =>
+			{
+				CustomButton? cb = canvas.SelectedCustomButton;
+				if (cb == null)
+					return;
+				ActionPicker.Show(this, cb.Key, key => { cb.Key = key; canvas.CustomChanged(); UpdateBar(); }, HideSystemBars);
+			};
+			textButton = MakeButton("", filled: false);
+			textButton.Click += (_, _) =>
+			{
+				CustomButton? cb = canvas.SelectedCustomButton;
+				if (cb == null)
+					return;
+				ActionPicker.ShowText(this, cb.Text, t => { cb.Text = t; canvas.CustomChanged(); UpdateBar(); }, HideSystemBars);
+			};
+			rowA.AddView(actionButton, new LinearLayout.LayoutParams(0, Dp(36), 1f));
+			rowA.AddView(textButton, new LinearLayout.LayoutParams(0, Dp(36), 1f) { LeftMargin = Dp(6) });
+			customBox.AddView(rowA, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(6) });
+
+			var hs = new HorizontalScrollView(this) { HorizontalScrollBarEnabled = false };
+			var swatches = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+			string[] palette = ButtonStyleActivity.Palette;
+			for (int k = 0; k < palette.Length; k++)
+			{
+				int rgb = Convert.ToInt32(palette[k], 16);
+				var sw = new View(this);
+				sw.Click += (_, _) =>
+				{
+					CustomButton? cb = canvas.SelectedCustomButton;
+					if (cb == null)
+						return;
+					cb.Rgb = rgb;
+					canvas.CustomChanged();
+					UpdateBar();
+				};
+				swatchViews.Add(sw);
+				swatches.AddView(sw, new LinearLayout.LayoutParams(Dp(28), Dp(28)) { RightMargin = Dp(8) });
+			}
+			hs.AddView(swatches);
+			customBox.AddView(hs, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(8) });
+			box.AddView(customBox, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+			customNote = Text(L.SelectCustomNote, 12, Color.Argb(200, 255, 255, 255), false);
+			box.AddView(customNote, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(6) });
+			return box;
+		}
+
 		private View BuildIconSection()
 		{
 			var box = new LinearLayout(this) { Orientation = Orientation.Vertical };
@@ -292,7 +369,6 @@ namespace CelesteAndroid
 			{
 				canvas.DpadMode = !canvas.DpadMode;
 				dirButton.Text = canvas.DpadMode ? L.DirDpad : L.DirAnalog;
-				canvas.Save();
 			};
 			dirRow.AddView(dirButton, new LinearLayout.LayoutParams(0, Dp(34), 1f));
 			box.AddView(dirRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(4) });
@@ -631,6 +707,29 @@ namespace CelesteAndroid
 			defaultIconButton.Enabled = canvas.SelectedHasIcon;
 			defaultIconButton.Alpha = canvas.SelectedHasIcon ? 1f : 0.45f;
 
+			CustomButton? sc = canvas.SelectedCustomButton;
+			customBox.Visibility = sc != null ? ViewStates.Visible : ViewStates.Gone;
+			customNote.Visibility = sc != null ? ViewStates.Gone : ViewStates.Visible;
+			removeButton.Enabled = sc != null;
+			removeButton.Alpha = sc != null ? 1f : 0.45f;
+			addButton.Enabled = canvas.CanAddCustom;
+			addButton.Alpha = canvas.CanAddCustom ? 1f : 0.45f;
+			if (sc != null)
+			{
+				actionButton.Text = L.ButtonAction + ": " + ButtonStyles.Display(sc.Key);
+				textButton.Text = L.ButtonText + ": " + (PixelButtonArt.CleanLabel(sc.Text) ?? L.TextAuto);
+				string[] palette = ButtonStyleActivity.Palette;
+				for (int k = 0; k < swatchViews.Count; k++)
+				{
+					bool sel = Convert.ToInt32(palette[k], 16) == sc.Rgb;
+					var d = new GradientDrawable();
+					d.SetShape(ShapeType.Oval);
+					d.SetColor(Color.ParseColor("#" + palette[k]));
+					d.SetStroke(Dp(sel ? 3 : 1), sel ? Accent : Color.Argb(160, 255, 255, 255));
+					swatchViews[k].Background = d;
+				}
+			}
+
 			opacitySeek.Progress = canvas.OpacityPercent;
 			UpdateLabel();
 			UpdateFpsRow();
@@ -848,6 +947,69 @@ namespace CelesteAndroid
 		private string CustomPath => Path.Combine(Path.GetDirectoryName(path) ?? "", "custom_buttons.txt");
 
 		public bool IsCustom(int i) => i >= CustomBase && i < CustomBase + customs.Count;
+		public CustomButton? SelectedCustomButton => IsCustom(Selected) ? customs[Selected - CustomBase] : null;
+		public bool CanAddCustom => customs.Count < MaxCustom;
+
+		public void CustomChanged()
+		{
+			Invalidate();
+			SelectionChanged?.Invoke();
+		}
+
+		public bool AddCustom()
+		{
+			if (!ready || customs.Count >= MaxCustom || Width <= 0 || Height <= 0)
+				return false;
+			int k = customs.Count, i = CustomBase + k;
+			customs.Add(new CustomButton());
+			fx[i] = 0.42f + (k % 6) * 0.035f;
+			fy[i] = 0.42f + (k / 6) * 0.12f + (k % 6) * 0.02f;
+			scale[i] = 1f;
+			hscale[i] = 1f;
+			shape[i] = 0;
+			DropIcon(i);
+			ClampIndex(i);
+			isDefault = false;
+			Selected = i;
+			SelectionChanged?.Invoke();
+			Invalidate();
+			return true;
+		}
+
+		public bool RemoveSelectedCustom()
+		{
+			if (!IsCustom(Selected))
+				return false;
+			int removed = Selected;
+			DropIcon(removed);
+			customs.RemoveAt(removed - CustomBase);
+			int end = CustomBase + customs.Count;
+			for (int i = removed; i < end; i++)
+			{
+				fx[i] = fx[i + 1];
+				fy[i] = fy[i + 1];
+				scale[i] = scale[i + 1];
+				hscale[i] = hscale[i + 1];
+				shape[i] = shape[i + 1];
+				icon[i] = icon[i + 1];
+				iconBmp[i] = iconBmp[i + 1];
+				iconPx[i] = iconPx[i + 1];
+			}
+			fx[end] = fy[end] = 0f;
+			scale[end] = hscale[end] = 1f;
+			shape[end] = 0;
+			icon[end] = null;
+			iconBmp[end] = null;
+			iconPx[end] = null;
+			foreach (Bitmap old in skinCache.Values)
+				old.Recycle();
+			skinCache.Clear();
+			isDefault = false;
+			Selected = Stick;
+			SelectionChanged?.Invoke();
+			Invalidate();
+			return true;
+		}
 		public bool IsShapeable(int i) => (i >= Jump && i <= Tab) || IsCustom(i);
 		public bool ShapeSupported => IsShapeable(Selected);
 		public int SelectedShape => ShapeSupported ? shape[Selected] : 0;
@@ -1287,7 +1449,7 @@ namespace CelesteAndroid
 		{
 			try
 			{
-				if (customs.Count == 0)
+				if (!ready)
 					return;
 				for (int k = 0; k < customs.Count; k++)
 				{
@@ -1536,7 +1698,8 @@ namespace CelesteAndroid
 		{
 			if (IsCustom(i))
 			{
-				string l = PixelButtonArt.LabelFor(customs[i - CustomBase].Key);
+				CustomButton cb = customs[i - CustomBase];
+				string l = PixelButtonArt.CleanLabel(cb.Text) ?? PixelButtonArt.LabelFor(cb.Key);
 				return l.Length > 0 ? l : null;
 			}
 			return i == Jump ? "A" : i == Dash ? "X" : i == Grab ? "G" : i == Tab ? "TAB" : null;

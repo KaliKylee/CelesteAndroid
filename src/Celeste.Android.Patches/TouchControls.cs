@@ -49,6 +49,7 @@ namespace CelesteAndroid
 		private static readonly Stopwatch clock = Stopwatch.StartNew();
 		private static long lastPollMs = -100;
 
+		private static bool dpadMode; // true = setas direcionais em vez do analógico (layout: dpad=1)
 		private static bool stickActive;
 		private static long stickKey;
 		private static Vector2 stickValue;
@@ -383,6 +384,11 @@ namespace CelesteAndroid
 						}
 						continue;
 					}
+					if (kv[0].Trim() == "dpad")
+					{
+						dpadMode = kv[1].Trim() == "1";
+						continue;
+					}
 					string layoutKey = kv[0].Trim();
 					if (layoutKey.StartsWith("shape_", StringComparison.Ordinal))
 					{
@@ -505,6 +511,11 @@ namespace CelesteAndroid
 
 		private static void UpdateStick(Vector2 pos)
 		{
+			if (dpadMode)
+			{
+				UpdateDpad(pos);
+				return;
+			}
 			float range = StickRange;
 			Vector2 delta = pos - StickBase;
 			float dist = delta.Length();
@@ -519,6 +530,31 @@ namespace CelesteAndroid
 			}
 			amount = (amount - StickDeadZone) / (1f - StickDeadZone);
 			stickValue = new Vector2(dir.X * amount, -dir.Y * amount);
+		}
+
+		// Setas direcionais: cada seta é digital (0 ou 1). O dedo pode deslizar entre as setas;
+		// perto das diagonais duas setas ficam ativas ao mesmo tempo.
+		private static void UpdateDpad(Vector2 pos)
+		{
+			float range = StickRange;
+			Vector2 d = pos - StickBase;
+			float t = range * 0.4f;
+			float ax = Math.Abs(d.X), ay = Math.Abs(d.Y);
+			bool h = ax > t, v = ay > t;
+			if (h && v)
+			{
+				if (ax > ay * 2f) v = false;
+				else if (ay > ax * 2f) h = false;
+			}
+			float x = h ? Math.Sign(d.X) : 0f;
+			float y = v ? -Math.Sign(d.Y) : 0f;
+			if (h && v)
+			{
+				x *= 0.7071f;
+				y *= 0.7071f;
+			}
+			stickValue = new Vector2(x, y);
+			stickKnob = Vector2.Zero;
 		}
 
 		private static GamePadState Synthesize()
@@ -546,7 +582,7 @@ namespace CelesteAndroid
 		}
 
 		private static SpriteBatch? batch;
-		private static Texture2D? disc, ring, glow, pixel;
+		private static Texture2D? disc, ring, glow, pixel, tri;
 		private static readonly Texture2D?[] sprites = new Texture2D?[5];
 
 		private static PixelButtonArt.Sprite SpriteOf(Btn b) => b switch
@@ -577,6 +613,7 @@ namespace CelesteAndroid
 				glow = MakeGlow(device, 128);
 				pixel = new Texture2D(device, 1, 1);
 				pixel.SetData(new[] { Color.White });
+				tri = MakeTriangle(device, 64);
 				foreach (Btn b in Enum.GetValues(typeof(Btn)))
 					sprites[(int)b] = MakeSprite(device, SpriteOf(b));
 			}
@@ -589,10 +626,15 @@ namespace CelesteAndroid
 				batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp, null, null);
 				Vector2 baseCenter = StickBase;
 				float range = StickRange;
-				Vector2 knob = baseCenter + stickKnob;
-				float a = stickActive ? Opacity * 1.3f : Opacity;
-				DrawCircle(ring!, baseCenter, range * 1.1f, Color.White * a);
-				DrawCircle(disc!, knob, range * 0.45f, Color.White * (a * 1.1f));
+				if (dpadMode)
+					DrawDpad(baseCenter, range);
+				else
+				{
+					Vector2 knob = baseCenter + stickKnob;
+					float a = stickActive ? Opacity * 1.3f : Opacity;
+					DrawCircle(ring!, baseCenter, range * 1.1f, Color.White * a);
+					DrawCircle(disc!, knob, range * 0.45f, Color.White * (a * 1.1f));
+				}
 				foreach (Btn b in Enum.GetValues(typeof(Btn)))
 					DrawGlow(b);
 				DrawCustomGlows();
@@ -737,7 +779,7 @@ namespace CelesteAndroid
 				DrawShaped(b);
 				return;
 			}
-			float alpha = pressed[(int)b] ? 1f : OpacityOf(b);
+			float alpha = OpacityOf(b); // pressed keeps the user's chosen opacity
 			batch!.Draw(sprites[(int)b]!, SpriteRect(b), (btnColor[(int)b] ?? Color.White) * alpha);
 		}
 
@@ -880,7 +922,7 @@ namespace CelesteAndroid
 			int i = (int)b;
 			bool down = pressed[i];
 			Vector2 c = Center(b);
-			Color tint = s.Photo ? (down ? new Color(200, 200, 200, 255) : Color.White * OpacityOf(b)) : Color.White * (down ? 1f : OpacityOf(b));
+			Color tint = s.Photo ? (down ? new Color(200, 200, 200, 255) * OpacityOf(b) : Color.White * OpacityOf(b)) : Color.White * OpacityOf(b);
 			batch!.Draw(s.Tex, new Rectangle((int)Math.Round(c.X - s.W / 2f), (int)Math.Round(c.Y - s.H / 2f) + (down && !s.Photo ? s.Cell : 0), s.W, s.H), tint);
 		}
 
@@ -916,7 +958,7 @@ namespace CelesteAndroid
 					continue;
 				CustomBtn c = customBtns[i];
 				bool down = i < customPressed.Length && customPressed[i];
-				GlowRect(CustomCenter(i), s, c.Shape, new Color((c.Rgb >> 16) & 255, (c.Rgb >> 8) & 255, c.Rgb & 255), (down ? 1f : CustomAlpha(c)) * (down ? 0.75f : 0.55f));
+				GlowRect(CustomCenter(i), s, c.Shape, new Color((c.Rgb >> 16) & 255, (c.Rgb >> 8) & 255, c.Rgb & 255), CustomAlpha(c) * (down ? 0.75f : 0.55f));
 			}
 		}
 
@@ -929,7 +971,7 @@ namespace CelesteAndroid
 					continue;
 				bool down = i < customPressed.Length && customPressed[i];
 				Vector2 c = CustomCenter(i);
-				Color tint = s.Photo ? (down ? new Color(200, 200, 200, 255) : Color.White * CustomAlpha(customBtns[i])) : Color.White * (down ? 1f : CustomAlpha(customBtns[i]));
+				Color tint = s.Photo ? (down ? new Color(200, 200, 200, 255) * CustomAlpha(customBtns[i]) : Color.White * CustomAlpha(customBtns[i])) : Color.White * CustomAlpha(customBtns[i]);
 				batch!.Draw(s.Tex, new Rectangle((int)Math.Round(c.X - s.W / 2f), (int)Math.Round(c.Y - s.H / 2f) + (down && !s.Photo ? s.Cell : 0), s.W, s.H), tint);
 			}
 		}
@@ -967,6 +1009,56 @@ namespace CelesteAndroid
 					float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(r, r)) / r;
 					float t = Math.Clamp((1f - d) / 0.30f, 0f, 1f);
 					byte v = (byte)(t * t * (3f - 2f * t) * 255f);
+					data[y * size + x] = new Color(v, v, v, v);
+				}
+			}
+			Texture2D tex = new(device, size, size);
+			tex.SetData(data);
+			return tex;
+		}
+
+		private static void DrawDpad(Vector2 c, float range)
+		{
+			float s = range * 0.71f;
+			float g = s * 1.05f;
+			float a = Opacity;
+			Vector2 sv = stickValue;
+			// 0 = cima, 1 = direita, 2 = baixo, 3 = esquerda
+			bool[] on = { sv.Y > 0.5f, sv.X > 0.5f, sv.Y < -0.5f, sv.X < -0.5f };
+			Vector2[] dir = { new(0, -1), new(1, 0), new(0, 1), new(-1, 0) };
+			int th = Math.Max(2, (int)Math.Round(s * 0.06f));
+			for (int i = 0; i < 4; i++)
+			{
+				Vector2 p = c + dir[i] * g + (on[i] ? new Vector2(0, s * 0.06f) : Vector2.Zero);
+				int x = (int)Math.Round(p.X - s / 2f), y = (int)Math.Round(p.Y - s / 2f), w = (int)Math.Round(s);
+				batch!.Draw(pixel!, new Rectangle(x, y, w, w), Color.White * (a * (on[i] ? 0.5f : 0.12f)));
+				Color edge = Color.White * a;
+				batch.Draw(pixel!, new Rectangle(x, y, w, th), edge);
+				batch.Draw(pixel!, new Rectangle(x, y + w - th, w, th), edge);
+				batch.Draw(pixel!, new Rectangle(x, y, th, w), edge);
+				batch.Draw(pixel!, new Rectangle(x + w - th, y, th, w), edge);
+				float ts = s * 0.6f;
+				batch.Draw(tri!, new Rectangle((int)Math.Round(p.X), (int)Math.Round(p.Y), (int)Math.Round(ts), (int)Math.Round(ts)), null,
+					Color.White * Math.Min(1f, a * 1.1f), i * MathHelper.PiOver2, new Vector2(32f, 32f), SpriteEffects.None, 0f);
+			}
+		}
+
+		private static Texture2D MakeTriangle(GraphicsDevice device, int size)
+		{
+			Color[] data = new Color[size * size];
+			float top = size * 0.12f, bottom = size * 0.82f, half = size * 0.38f;
+			for (int y = 0; y < size; y++)
+			{
+				for (int x = 0; x < size; x++)
+				{
+					float py = y + 0.5f, px = x + 0.5f;
+					float alpha = 0f;
+					if (py >= top && py <= bottom)
+					{
+						float w = (py - top) / (bottom - top) * half;
+						alpha = Math.Clamp(w - Math.Abs(px - size / 2f) + 0.5f, 0f, 1f);
+					}
+					byte v = (byte)(alpha * 255f);
 					data[y * size + x] = new Color(v, v, v, v);
 				}
 			}

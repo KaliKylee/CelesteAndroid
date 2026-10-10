@@ -498,5 +498,83 @@ namespace CelesteAndroid
 			}
 			return res;
 		}
+
+		// Média dos pixels da foto dentro de um retângulo (reduz sem serrilhado ao diminuir a imagem).
+		private static int BoxAverage(int[] s, int w, int h, float cx, float cy, float fw, float fh)
+		{
+			int x0 = Math.Clamp((int)MathF.Floor(cx - fw / 2f), 0, w - 1), x1 = Math.Clamp((int)MathF.Ceiling(cx + fw / 2f), x0 + 1, w);
+			int y0 = Math.Clamp((int)MathF.Floor(cy - fh / 2f), 0, h - 1), y1 = Math.Clamp((int)MathF.Ceiling(cy + fh / 2f), y0 + 1, h);
+			long sa = 0, sr = 0, sg = 0, sb = 0;
+			int n = 0;
+			for (int y = y0; y < y1; y++)
+			{
+				for (int x = x0; x < x1; x++)
+				{
+					int c = s[y * w + x];
+					int a = (c >> 24) & 255;
+					sa += a;
+					sr += ((c >> 16) & 255) * a;
+					sg += ((c >> 8) & 255) * a;
+					sb += (c & 255) * a;
+					n++;
+				}
+			}
+			if (n == 0 || sa == 0)
+				return 0;
+			int r = (int)(sr / sa), g = (int)(sg / sa), b = (int)(sb / sa), al = (int)(sa / n);
+			return (al << 24) | (r << 16) | (g << 8) | b;
+		}
+
+		// Foto original no formato do botão: sem moldura, brilho nem pixelização; só a borda é suavizada.
+		// shape: 0 = elipse, 1/2 = retângulo de cantos levemente arredondados. Retorna ARGB (alfa reto).
+		public static int[] PhotoSkin(int w, int h, int shape, int[] photo, int pw, int ph)
+		{
+			var res = new int[w * h];
+			float sa = pw / (float)ph, ta = w / (float)h;
+			float cu0 = 0f, cv0 = 0f, cuS = 1f, cvS = 1f;
+			if (sa > ta)
+			{
+				cuS = ta / sa;
+				cu0 = (1f - cuS) / 2f;
+			}
+			else
+			{
+				cvS = sa / ta;
+				cv0 = (1f - cvS) / 2f;
+			}
+			float fw = cuS * pw / w, fh = cvS * ph / h;
+			float hw = w / 2f, hh = h / 2f;
+			float minHalf = Math.Min(hw, hh);
+			float rad = Math.Min(w, h) * 0.12f;
+			for (int y = 0; y < h; y++)
+			{
+				for (int x = 0; x < w; x++)
+				{
+					float px = x + 0.5f - hw, py = y + 0.5f - hh;
+					float d;
+					if (shape == 0)
+					{
+						float r = MathF.Sqrt((px / hw) * (px / hw) + (py / hh) * (py / hh));
+						d = (1f - r) * minHalf;
+					}
+					else
+					{
+						float qx = MathF.Abs(px) - (hw - rad), qy = MathF.Abs(py) - (hh - rad);
+						float ox = MathF.Max(qx, 0f), oy = MathF.Max(qy, 0f);
+						d = -(MathF.Sqrt(ox * ox + oy * oy) + MathF.Min(MathF.Max(qx, qy), 0f) - rad);
+					}
+					float cov = Math.Clamp(d + 0.5f, 0f, 1f);
+					if (cov <= 0f)
+						continue;
+					float sx = (cu0 + (x + 0.5f) / w * cuS) * pw, sy = (cv0 + (y + 0.5f) / h * cvS) * ph;
+					int c = fw > 1.5f || fh > 1.5f ? BoxAverage(photo, pw, ph, sx, sy, fw, fh) : Bilerp(photo, pw, ph, sx - 0.5f, sy - 0.5f);
+					int a = (int)Math.Round(((c >> 24) & 255) * cov);
+					if (a <= 0)
+						continue;
+					res[y * w + x] = (a << 24) | (c & 0xFFFFFF);
+				}
+			}
+			return res;
+		}
 	}
 }

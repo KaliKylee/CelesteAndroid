@@ -80,6 +80,7 @@ namespace CelesteAndroid
 		{
 			public Texture2D Tex = null!;
 			public int W, H, Cell;
+			public bool Photo;
 		}
 
 		private static readonly SkinTex?[] shapeSkin = new SkinTex?[5];
@@ -140,14 +141,14 @@ namespace CelesteAndroid
 				return "";
 			string n = key.Value.ToString();
 			if (n.Length == 2 && n[0] == 'D' && char.IsDigit(n[1])) return n.Substring(1);
-			if (n.StartsWith("NumPad")) return "N" + n.Substring(6);
+			if (n.StartsWith("NumPad", StringComparison.Ordinal)) return "N" + n.Substring(6);
 			return n switch
 			{
 				"Space" => "SPC", "Enter" => "ENT", "Escape" => "ESC", "Back" => "BS", "Up" => "UP", "Down" => "DN",
 				"Left" => "LT", "Right" => "RT", "LeftShift" => "LSH", "RightShift" => "RSH", "LeftControl" => "LCT",
 				"RightControl" => "RCT", "LeftAlt" => "LAL", "RightAlt" => "RAL", "PageUp" => "PGU", "PageDown" => "PGD",
 				"Home" => "HOM", "Insert" => "INS", "Delete" => "DEL",
-				_ => n.StartsWith("Oem") ? "SYM" : n.ToUpperInvariant(),
+				_ => n.StartsWith("Oem", StringComparison.Ordinal) ? "SYM" : n.ToUpperInvariant(),
 			};
 		}
 
@@ -163,7 +164,7 @@ namespace CelesteAndroid
 				foreach (string line in File.ReadAllLines(file))
 				{
 					string[] kv = line.Split('=');
-					if (kv.Length != 2 || !kv[0].Trim().StartsWith("c"))
+					if (kv.Length != 2 || !kv[0].Trim().StartsWith("c", StringComparison.Ordinal))
 						continue;
 					string[] v = kv[1].Split(',');
 					if ((v.Length != 6 && v.Length != 9) || customBtns.Count >= 12)
@@ -742,9 +743,52 @@ namespace CelesteAndroid
 
 		private static string? ShapeLabel(Btn b) => b switch { Btn.Jump => "A", Btn.Dash => "X", Btn.Grab => "G", Btn.Tab => "TAB", _ => null };
 
+		// Foto da galeria exibida como está (recortada na forma do botão), sem moldura nem efeitos.
+		private static SkinTex? BuildPhotoTex(GraphicsDevice device, int shape, float w, float h, ref string? iconName)
+		{
+			if (iconName == null)
+				return null;
+			try
+			{
+				using FileStream fs = File.OpenRead(Path.Combine(iconDir, iconName));
+				using Texture2D src = Texture2D.FromStream(device, fs);
+				int pw = src.Width, ph = src.Height;
+				Color[] px = new Color[pw * ph];
+				src.GetData(px);
+				int[] photo = new int[px.Length];
+				for (int k = 0; k < px.Length; k++)
+					photo[k] = (px[k].A << 24) | (px[k].R << 16) | (px[k].G << 8) | px[k].B;
+
+				int tw = Math.Clamp((int)Math.Round(w), 8, 1024), th = Math.Clamp((int)Math.Round(h), 8, 1024);
+				int[] argb = PixelButtonArt.PhotoSkin(tw, th, shape, photo, pw, ph);
+				Color[] data = new Color[tw * th];
+				for (int k = 0; k < data.Length; k++)
+				{
+					int c = argb[k];
+					int a = (c >> 24) & 255;
+					data[k] = a == 0 ? Color.Transparent : new Color((((c >> 16) & 255) * a) / 255, (((c >> 8) & 255) * a) / 255, ((c & 255) * a) / 255, a);
+				}
+				Texture2D tex = new(device, tw, th);
+				tex.SetData(data);
+				return new SkinTex { Tex = tex, W = tw, H = th, Cell = 1, Photo = true };
+			}
+			catch (Exception)
+			{
+				iconName = null;
+				return null;
+			}
+		}
+
 		// Monta a textura pixel art do botão (e, se houver, a foto da galeria dentro da moldura).
 		private static SkinTex BuildSkinTex(GraphicsDevice device, int[] pal, int shape, float w, float h, string? label, bool pause, ref string? iconName)
 		{
+			if (iconName != null)
+			{
+				SkinTex? photoTex = BuildPhotoTex(device, shape, w, h, ref iconName);
+				if (photoTex != null)
+					return photoTex;
+			}
+
 			PixelButtonArt.Snap(w, h, out int cols, out int rows, out int cell);
 			int[]? photo = null;
 			int pw = 0, ph = 0;
@@ -820,7 +864,7 @@ namespace CelesteAndroid
 		private static void DrawShapedGlow(Btn b)
 		{
 			SkinTex? s = ShapeSkin(b);
-			if (s == null)
+			if (s == null || s.Photo)
 				return;
 			int i = (int)b;
 			int rgb = SpriteOf(b).GlowRgb;
@@ -836,7 +880,8 @@ namespace CelesteAndroid
 			int i = (int)b;
 			bool down = pressed[i];
 			Vector2 c = Center(b);
-			batch!.Draw(s.Tex, new Rectangle((int)Math.Round(c.X - s.W / 2f), (int)Math.Round(c.Y - s.H / 2f) + (down ? s.Cell : 0), s.W, s.H), Color.White * (down ? 1f : OpacityOf(b)));
+			Color tint = s.Photo ? (down ? new Color(200, 200, 200, 255) : Color.White * OpacityOf(b)) : Color.White * (down ? 1f : OpacityOf(b));
+			batch!.Draw(s.Tex, new Rectangle((int)Math.Round(c.X - s.W / 2f), (int)Math.Round(c.Y - s.H / 2f) + (down && !s.Photo ? s.Cell : 0), s.W, s.H), tint);
 		}
 
 		private static SkinTex? CustomSkinOf(int i)
@@ -867,7 +912,7 @@ namespace CelesteAndroid
 			for (int i = 0; i < customBtns.Count; i++)
 			{
 				SkinTex? s = CustomSkinOf(i);
-				if (s == null)
+				if (s == null || s.Photo)
 					continue;
 				CustomBtn c = customBtns[i];
 				bool down = i < customPressed.Length && customPressed[i];
@@ -884,7 +929,8 @@ namespace CelesteAndroid
 					continue;
 				bool down = i < customPressed.Length && customPressed[i];
 				Vector2 c = CustomCenter(i);
-				batch!.Draw(s.Tex, new Rectangle((int)Math.Round(c.X - s.W / 2f), (int)Math.Round(c.Y - s.H / 2f) + (down ? s.Cell : 0), s.W, s.H), Color.White * (down ? 1f : CustomAlpha(customBtns[i])));
+				Color tint = s.Photo ? (down ? new Color(200, 200, 200, 255) : Color.White * CustomAlpha(customBtns[i])) : Color.White * (down ? 1f : CustomAlpha(customBtns[i]));
+				batch!.Draw(s.Tex, new Rectangle((int)Math.Round(c.X - s.W / 2f), (int)Math.Round(c.Y - s.H / 2f) + (down && !s.Photo ? s.Cell : 0), s.W, s.H), tint);
 			}
 		}
 

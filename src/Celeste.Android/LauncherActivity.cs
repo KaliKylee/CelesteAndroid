@@ -226,21 +226,17 @@ namespace CelesteAndroid
 
 		private void ShowOptionsMenu()
 		{
-			const int EditControlsId = 0, ShowFpsId = 1, HideTouchId = 2, IndividualId = 3;
+			const int EditControlsId = 0, ShowFpsId = 1, HideTouchId = 2;
 			var menu = new PopupMenu(this, optionsButton);
 			menu.Menu!.Add(0, EditControlsId, 0, L.EditControls);
 			menu.Menu.Add(0, ShowFpsId, 1, L.ShowFps)!.SetCheckable(true)!.SetChecked(GameOptions.ShowFps(Prefs));
 			menu.Menu.Add(0, HideTouchId, 2, L.HideTouchButtons)!.SetCheckable(true)!.SetChecked(GameOptions.HideTouch(Prefs));
-			menu.Menu.Add(0, IndividualId, 3, L.IndividualButtons);
 			menu.MenuItemClick += (_, e) =>
 			{
 				switch (e.Item!.ItemId)
 				{
 					case EditControlsId:
 						StartActivity(new Intent(this, typeof(ControlsEditorActivity)));
-						break;
-					case IndividualId:
-						StartActivity(new Intent(this, typeof(ButtonStyleActivity)));
 						break;
 					case ShowFpsId:
 						GameOptions.SetShowFps(Prefs, !GameOptions.ShowFps(Prefs));

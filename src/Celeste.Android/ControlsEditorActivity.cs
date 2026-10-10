@@ -46,6 +46,10 @@ namespace CelesteAndroid
 		private Button addButton = null!, removeButton = null!, actionButton = null!, textButton = null!;
 		private LinearLayout customBox = null!;
 		private TextView customNote = null!;
+		private Button autoSwatch = null!;
+		private TextView btnOpacityLabel = null!;
+		private SeekBar btnOpacitySeek = null!;
+		private CheckBox btnOpacityGlobal = null!;
 		private readonly List<View> swatchViews = new();
 		private int pickTarget = -1;
 
@@ -273,18 +277,19 @@ namespace CelesteAndroid
 			actionButton = MakeButton("", filled: false);
 			actionButton.Click += (_, _) =>
 			{
-				CustomButton? cb = canvas.SelectedCustomButton;
-				if (cb == null)
+				if (!canvas.HasAppearance)
 					return;
-				ActionPicker.Show(this, cb.Key, key => { cb.Key = key; canvas.CustomChanged(); UpdateBar(); }, HideSystemBars);
+				if (canvas.SelectedCustomButton != null)
+					ActionPicker.Show(this, canvas.SelectedKeyValue, key => { canvas.SetSelectedKey(key); UpdateBar(); }, HideSystemBars);
+				else
+					ActionPicker.ShowKey(this, canvas.SelectedKeyValue, key => { canvas.SetSelectedKey(key); UpdateBar(); }, HideSystemBars);
 			};
 			textButton = MakeButton("", filled: false);
 			textButton.Click += (_, _) =>
 			{
-				CustomButton? cb = canvas.SelectedCustomButton;
-				if (cb == null)
+				if (!canvas.HasAppearance || !canvas.SelectedTextEditable)
 					return;
-				ActionPicker.ShowText(this, cb.Text, t => { cb.Text = t; canvas.CustomChanged(); UpdateBar(); }, HideSystemBars);
+				ActionPicker.ShowText(this, canvas.SelectedTextValue, t => { canvas.SetSelectedText(t); UpdateBar(); }, HideSystemBars);
 			};
 			rowA.AddView(actionButton, new LinearLayout.LayoutParams(0, Dp(36), 1f));
 			rowA.AddView(textButton, new LinearLayout.LayoutParams(0, Dp(36), 1f) { LeftMargin = Dp(6) });
@@ -292,18 +297,25 @@ namespace CelesteAndroid
 
 			var hs = new HorizontalScrollView(this) { HorizontalScrollBarEnabled = false };
 			var swatches = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-			string[] palette = ButtonStyleActivity.Palette;
+			autoSwatch = MakeButton("A", filled: false);
+			autoSwatch.Click += (_, _) =>
+			{
+				if (!canvas.HasAppearance)
+					return;
+				canvas.SetSelectedRgb(-1);
+				UpdateBar();
+			};
+			swatches.AddView(autoSwatch, new LinearLayout.LayoutParams(Dp(28), Dp(28)) { RightMargin = Dp(8) });
+			string[] palette = ButtonStyles.Palette;
 			for (int k = 0; k < palette.Length; k++)
 			{
 				int rgb = Convert.ToInt32(palette[k], 16);
 				var sw = new View(this);
 				sw.Click += (_, _) =>
 				{
-					CustomButton? cb = canvas.SelectedCustomButton;
-					if (cb == null)
+					if (!canvas.HasAppearance)
 						return;
-					cb.Rgb = rgb;
-					canvas.CustomChanged();
+					canvas.SetSelectedRgb(rgb);
 					UpdateBar();
 				};
 				swatchViews.Add(sw);
@@ -311,6 +323,27 @@ namespace CelesteAndroid
 			}
 			hs.AddView(swatches);
 			customBox.AddView(hs, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(8) });
+
+			var opRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+			opRow.SetGravity(GravityFlags.CenterVertical);
+			btnOpacityLabel = Text("", 12, Color.White, true);
+			opRow.AddView(btnOpacityLabel, new LinearLayout.LayoutParams(Dp(110), ViewGroup.LayoutParams.WrapContent));
+			btnOpacitySeek = MakeSeek(100, p =>
+			{
+				canvas.SetSelectedOpacity(p);
+				UpdateBar();
+			});
+			opRow.AddView(btnOpacitySeek, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+			btnOpacityGlobal = new CheckBox(this) { Text = L.UseGlobalOpacity };
+			btnOpacityGlobal.SetTextSize(ComplexUnitType.Sp, 11);
+			btnOpacityGlobal.SetTextColor(Color.White);
+			btnOpacityGlobal.Click += (_, _) =>
+			{
+				canvas.SetSelectedOpacity(btnOpacityGlobal.Checked ? -1 : canvas.OpacityPercent);
+				UpdateBar();
+			};
+			opRow.AddView(btnOpacityGlobal, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent) { LeftMargin = Dp(6) });
+			customBox.AddView(opRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(4) });
 			box.AddView(customBox, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
 
 			customNote = Text(L.SelectCustomNote, 12, Color.Argb(200, 255, 255, 255), false);
@@ -707,20 +740,33 @@ namespace CelesteAndroid
 			defaultIconButton.Alpha = canvas.SelectedHasIcon ? 1f : 0.45f;
 
 			CustomButton? sc = canvas.SelectedCustomButton;
-			customBox.Visibility = sc != null ? ViewStates.Visible : ViewStates.Gone;
-			customNote.Visibility = sc != null ? ViewStates.Gone : ViewStates.Visible;
+			bool appearance = canvas.HasAppearance;
+			customBox.Visibility = appearance ? ViewStates.Visible : ViewStates.Gone;
+			customNote.Visibility = appearance ? ViewStates.Gone : ViewStates.Visible;
 			removeButton.Enabled = sc != null;
 			removeButton.Alpha = sc != null ? 1f : 0.45f;
 			addButton.Enabled = canvas.CanAddCustom;
 			addButton.Alpha = canvas.CanAddCustom ? 1f : 0.45f;
-			if (sc != null)
+			if (appearance)
 			{
-				actionButton.Text = L.ButtonAction + ": " + ButtonStyles.Display(sc.Key);
-				textButton.Text = L.ButtonText + ": " + (PixelButtonArt.CleanLabel(sc.Text) ?? L.TextAuto);
-				string[] palette = ButtonStyleActivity.Palette;
+				actionButton.Text = (sc != null ? L.ButtonAction : L.KeyboardKey) + ": " + ButtonStyles.Display(canvas.SelectedKeyValue);
+				textButton.Visibility = canvas.SelectedTextEditable ? ViewStates.Visible : ViewStates.Gone;
+				textButton.Text = L.ButtonText + ": " + (PixelButtonArt.CleanLabel(canvas.SelectedTextValue) ?? L.TextAuto);
+				int selRgb = canvas.SelectedRgb;
+				autoSwatch.Visibility = sc == null ? ViewStates.Visible : ViewStates.Gone;
+				StyleButton(autoSwatch, selRgb < 0);
+				int selOp = canvas.SelectedOpacity;
+				int shownOp = selOp < 0 ? canvas.OpacityPercent : selOp;
+				btnOpacityLabel.Text = $"{L.Opacity}: {shownOp}%";
+				if (btnOpacitySeek.Progress != shownOp)
+					btnOpacitySeek.Progress = shownOp;
+				btnOpacitySeek.Enabled = selOp >= 0;
+				btnOpacitySeek.Alpha = selOp >= 0 ? 1f : 0.45f;
+				btnOpacityGlobal.Checked = selOp < 0;
+				string[] palette = ButtonStyles.Palette;
 				for (int k = 0; k < swatchViews.Count; k++)
 				{
-					bool picked = Convert.ToInt32(palette[k], 16) == sc.Rgb;
+					bool picked = Convert.ToInt32(palette[k], 16) == selRgb;
 					var d = new GradientDrawable();
 					d.SetShape(ShapeType.Oval);
 					d.SetColor(Color.ParseColor("#" + palette[k]));
@@ -947,6 +993,61 @@ namespace CelesteAndroid
 		public CustomButton? SelectedCustomButton => IsCustom(Selected) ? customs[Selected - CustomBase] : null;
 		public bool CanAddCustom => customs.Count < MaxCustom;
 
+		private ButtonStyle[] styles = ButtonStyles.Load("");
+		private string StylePath => Path.Combine(Path.GetDirectoryName(path) ?? "", "button_style.txt");
+		private ButtonStyle? StyleOf(int i) => i >= Jump && i <= Tab ? styles[i - Jump] : null;
+		public ButtonStyle? SelectedStyle => StyleOf(Selected);
+		public bool HasAppearance => IsCustom(Selected) || SelectedStyle != null;
+		public bool SelectedTextEditable => IsCustom(Selected) || (SelectedStyle != null && Selected != Pause);
+		public string SelectedKeyValue => SelectedCustomButton?.Key ?? SelectedStyle?.Key ?? "-";
+		public string? SelectedTextValue => SelectedCustomButton != null ? SelectedCustomButton.Text : SelectedStyle?.Text;
+		public int SelectedRgb => SelectedCustomButton?.Rgb ?? SelectedStyle?.Rgb ?? -1;
+		public int SelectedOpacity => SelectedCustomButton?.Opacity ?? SelectedStyle?.Opacity ?? -1;
+
+		public void SetSelectedKey(string key)
+		{
+			if (SelectedCustomButton != null)
+				SelectedCustomButton.Key = key;
+			else if (SelectedStyle != null)
+				SelectedStyle.Key = key;
+			CustomChanged();
+		}
+
+		public void SetSelectedText(string? text)
+		{
+			if (SelectedCustomButton != null)
+				SelectedCustomButton.Text = text;
+			else if (SelectedStyle != null)
+				SelectedStyle.Text = PixelButtonArt.CleanLabel(text);
+			CustomChanged();
+		}
+
+		public void SetSelectedRgb(int rgb)
+		{
+			if (SelectedCustomButton != null)
+				SelectedCustomButton.Rgb = rgb < 0 ? 0x4DA3FF : rgb;
+			else if (SelectedStyle != null)
+				SelectedStyle.Rgb = rgb;
+			CustomChanged();
+		}
+
+		public void SetSelectedOpacity(int opacity)
+		{
+			if (SelectedCustomButton != null)
+				SelectedCustomButton.Opacity = opacity;
+			else if (SelectedStyle != null)
+				SelectedStyle.Opacity = opacity;
+			CustomChanged();
+		}
+
+		private void LoadStyles() => styles = ButtonStyles.Load(StylePath);
+
+		private bool StyleSkinned(int i)
+		{
+			ButtonStyle? st = StyleOf(i);
+			return st != null && (st.Rgb >= 0 || (i != Pause && PixelButtonArt.CleanLabel(st.Text) != null));
+		}
+
 		public void CustomChanged()
 		{
 			Invalidate();
@@ -1122,7 +1223,7 @@ namespace CelesteAndroid
 		private float BtnH(int i) => (i == Pause ? 0.32f : i == Tab ? 0.4f : 0.5f) * Unit * 2f * (shape[i] == 2 ? hscale[i] : scale[i]);
 		private float HalfW(int i) => i == Stick ? StickRange * 1.1f : BtnW(i) / 2f;
 		private float HalfH(int i) => i == Stick ? StickRange * 1.1f : BtnH(i) / 2f;
-		private bool Skinned(int i) => IsCustom(i) || (i >= Jump && i <= Tab && (shape[i] != 0 || iconBmp[i] != null));
+		private bool Skinned(int i) => IsCustom(i) || (i >= Jump && i <= Tab && (shape[i] != 0 || iconBmp[i] != null || StyleSkinned(i)));
 
 		private float HitScore(int i, float x, float y)
 		{
@@ -1176,6 +1277,7 @@ namespace CelesteAndroid
 			SetDefaults();
 			LoadFile();
 			LoadCustoms();
+			LoadStyles();
 			LayoutLoaded?.Invoke();
 			SelectionChanged?.Invoke();
 		}
@@ -1213,6 +1315,8 @@ namespace CelesteAndroid
 		{
 			SetDefaults();
 			ResetCustoms();
+			for (int i = 0; i < styles.Length; i++)
+				styles[i] = new ButtonStyle();
 			Invalidate();
 		}
 
@@ -1279,6 +1383,14 @@ namespace CelesteAndroid
 		public void Save()
 		{
 			SaveCustoms();
+			try
+			{
+				if (ready)
+					ButtonStyles.Save(StylePath, styles);
+			}
+			catch (Exception)
+			{
+			}
 			try
 			{
 				if (isDefault && !dpadMode)
@@ -1645,7 +1757,7 @@ namespace CelesteAndroid
 				float half = cell * n / 2f;
 				int body = sp.GlowRgb;
 				int cr = (body >> 16) & 255, cg = (body >> 8) & 255, cb = body & 255;
-				float alpha = ButtonAlpha;
+				float alpha = AlphaOf(i);
 
 				int glowA = Math.Clamp((int)Math.Round(alpha * 0.55f * 255f), 0, 255);
 				int glowColor = Color.Argb(glowA, cr, cg, cb).ToArgb();
@@ -1688,7 +1800,13 @@ namespace CelesteAndroid
 			}
 		}
 
-		private int[] PaletteOf(int i) => IsCustom(i) ? PixelButtonArt.PaletteFrom(customs[i - CustomBase].Rgb) : Sprites[i]!.Rgb;
+		private int[] PaletteOf(int i)
+		{
+			if (IsCustom(i))
+				return PixelButtonArt.PaletteFrom(customs[i - CustomBase].Rgb);
+			ButtonStyle? st = StyleOf(i);
+			return st != null && st.Rgb >= 0 ? PixelButtonArt.PaletteFrom(st.Rgb) : Sprites[i]!.Rgb;
+		}
 
 		private string? LabelOfItem(int i)
 		{
@@ -1698,14 +1816,15 @@ namespace CelesteAndroid
 				string l = PixelButtonArt.CleanLabel(cb.Text) ?? PixelButtonArt.LabelFor(cb.Key);
 				return l.Length > 0 ? l : null;
 			}
+			string? own = i == Pause ? null : PixelButtonArt.CleanLabel(StyleOf(i)?.Text);
+			if (own != null)
+				return own;
 			return i == Jump ? "A" : i == Dash ? "X" : i == Grab ? "G" : i == Tab ? "TAB" : null;
 		}
 
 		private float AlphaOf(int i)
 		{
-			if (!IsCustom(i))
-				return ButtonAlpha;
-			int op = customs[i - CustomBase].Opacity;
+			int op = IsCustom(i) ? customs[i - CustomBase].Opacity : StyleOf(i)?.Opacity ?? -1;
 			if (op < 0)
 				return ButtonAlpha;
 			float o = op / 100f;

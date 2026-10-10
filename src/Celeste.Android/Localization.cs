@@ -190,18 +190,6 @@ namespace CelesteAndroid
 			"编辑控制",
 			"컨트롤 편집");
 
-		public static string IndividualButtons => T(
-			"Criar botões individualmente",
-			"Create buttons individually",
-			"Crear botones individualmente",
-			"ボタンを個別に作成",
-			"Créer les boutons individuellement",
-			"Crea i pulsanti singolarmente",
-			"Tasten einzeln erstellen",
-			"Создать кнопки отдельно",
-			"单独创建按钮",
-			"버튼 개별 설정");
-
 		public static string KeyboardKey => T(
 			"Tecla do teclado",
 			"Keyboard key",
@@ -333,30 +321,6 @@ namespace CelesteAndroid
 			"Неверный файл или ошибка чтения/записи.",
 			"文件无效或读写出错。",
 			"잘못된 파일이거나 읽기/쓰기 오류입니다.");
-
-		public static string CustomButtons => T(
-			"Botões personalizados",
-			"Custom buttons",
-			"Botones personalizados",
-			"カスタムボタン",
-			"Boutons personnalisés",
-			"Pulsanti personalizzati",
-			"Eigene Tasten",
-			"Свои кнопки",
-			"自定义按钮",
-			"사용자 버튼");
-
-		public static string DefaultButtons => T(
-			"Botões padrão",
-			"Default buttons",
-			"Botones predeterminados",
-			"標準ボタン",
-			"Boutons par défaut",
-			"Pulsanti predefiniti",
-			"Standardtasten",
-			"Стандартные кнопки",
-			"默认按钮",
-			"기본 버튼");
 
 		public static string AddButton => T(
 			"Adicionar botão",
@@ -568,16 +532,16 @@ namespace CelesteAndroid
 			"Auto", "Auto", "Auto", "自動", "Auto", "Auto", "Auto", "Авто", "自动", "자동");
 
 		public static string SelectCustomNote => T(
-			"Toque em Adicionar, ou selecione um botão criado por você, para editar ação, texto e cor.",
-			"Tap Add, or select a button you created, to edit its action, text and color.",
-			"Pulsa Añadir, o selecciona un botón creado por ti, para editar acción, texto y color.",
-			"「追加」をタップするか、作成したボタンを選ぶと、動作・テキスト・色を編集できます。",
-			"Touchez Ajouter, ou sélectionnez un bouton créé, pour modifier action, texte et couleur.",
-			"Tocca Aggiungi, o seleziona un pulsante creato da te, per modificare azione, testo e colore.",
-			"Tippe auf Hinzufügen oder wähle eine eigene Taste, um Aktion, Text und Farbe zu ändern.",
-			"Нажмите «Добавить» или выберите свою кнопку, чтобы изменить действие, текст и цвет.",
-			"点按“添加按钮”，或选择自己创建的按钮，即可编辑操作、文字和颜色。",
-			"추가를 누르거나 직접 만든 버튼을 선택해 동작, 텍스트, 색상을 편집하세요.");
+			"Toque em Adicionar, ou selecione um botão na tela, para editar ação, texto, cor e opacidade.",
+			"Tap Add, or select a button on screen, to edit its action, text, color and opacity.",
+			"Pulsa Añadir, o selecciona un botón en pantalla, para editar acción, texto, color y opacidad.",
+			"「追加」をタップするか、画面上のボタンを選ぶと、動作・テキスト・色・不透明度を編集できます。",
+			"Touchez Ajouter, ou sélectionnez un bouton à l'écran, pour modifier action, texte, couleur et opacité.",
+			"Tocca Aggiungi, o seleziona un pulsante sullo schermo, per modificare azione, testo, colore e opacità.",
+			"Tippe auf Hinzufügen oder wähle eine Taste auf dem Bildschirm, um Aktion, Text, Farbe und Deckkraft zu ändern.",
+			"Нажмите «Добавить» или выберите кнопку на экране, чтобы изменить действие, текст, цвет и непрозрачность.",
+			"点按“添加按钮”，或选择屏幕上的按钮，即可编辑操作、文字、颜色和不透明度。",
+			"추가를 누르거나 화면의 버튼을 선택해 동작, 텍스트, 색상, 불투명도를 편집하세요.");
 
 		public static string TabMore => T(
 			"Mais", "More", "Más", "その他", "Plus", "Altro", "Mehr", "Ещё", "更多", "더보기");

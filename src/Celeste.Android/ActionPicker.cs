@@ -28,6 +28,9 @@ namespace CelesteAndroid
 			dialog.Show();
 		}
 
+		public static void ShowKey(Activity activity, string current, Action<string> onPicked, Action? onClosed = null)
+			=> PickKey(activity, current, onPicked, onClosed);
+
 		private static void PickPad(Activity activity, string current, Action<string> onPicked, Action? onClosed)
 		{
 			string[] ids = PixelButtonArt.PadIds;
@@ -51,7 +54,7 @@ namespace CelesteAndroid
 
 		private static void PickKey(Activity activity, string current, Action<string> onPicked, Action? onClosed)
 		{
-			string[] keys = ButtonStyleActivity.KeyList;
+			string[] keys = ButtonStyles.KeyList;
 			string[] labels = new string[keys.Length];
 			for (int i = 0; i < labels.Length; i++)
 				labels[i] = ButtonStyles.Display(keys[i]);

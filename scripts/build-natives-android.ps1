@@ -12,7 +12,7 @@ if (-not $ndk -or -not (Test-Path "$ndk\build\cmake\android.toolchain.cmake")) {
 }
 if (-not (Test-Path "$ndk\build\cmake\android.toolchain.cmake")) { throw "NDK não encontrado (ANDROID_NDK_HOME)." }
 
-$abiDir = @{ 'arm64-v8a' = 'android-arm64'; 'x86_64' = 'android-x64' }[$Abi]
+$abiDir = @{ 'arm64-v8a' = 'android-arm64'; 'armeabi-v7a' = 'android-arm'; 'x86_64' = 'android-x64' }[$Abi]
 $build = Join-Path $root "build\$abiDir"
 $out = Join-Path $root "natives\$abiDir"
 if ($Clean) { Remove-Item -Recurse -Force $build -ErrorAction SilentlyContinue }

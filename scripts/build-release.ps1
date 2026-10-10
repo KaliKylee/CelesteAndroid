@@ -1,6 +1,8 @@
 param(
 	[switch]$Personal,
-	[switch]$EmbedGame
+	[switch]$EmbedGame,
+	[ValidateSet('arm64-v8a', 'armeabi-v7a')]
+	[string]$Abi = 'arm64-v8a'
 )
 $ErrorActionPreference = 'Stop'
 
@@ -30,15 +32,18 @@ else {
 
 & (Join-Path $PSScriptRoot 'generate-game-art.ps1') | Out-Null
 
+$suffix = if ($Abi -eq 'armeabi-v7a') { '-arm32' } else { '' }
+
 if ($Personal) {
-	$name = "CelesteAndroid-$version-personal.apk"
+	$name = "CelesteAndroid-$version$suffix-personal.apk"
 	$flags = @('-p:UseGameArt=true')
 	if ($EmbedGame) { $flags += '-p:EmbedGame=true' }
 }
 else {
-	$name = "CelesteAndroid-$version.apk"
+	$name = "CelesteAndroid-$version$suffix.apk"
 	$flags = @('-p:UseGameArt=false')
 }
+$flags += "-p:CelesteAbi=$Abi"
 
 $publish = Join-Path $root 'build\publish'
 Remove-Item -Recurse -Force $publish -ErrorAction SilentlyContinue

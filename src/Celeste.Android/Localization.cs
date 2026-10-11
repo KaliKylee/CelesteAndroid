@@ -477,6 +477,9 @@ namespace CelesteAndroid
 			new[] { "FPS ↖ 左上", "FPS ↗ 右上", "FPS ↙ 左下", "FPS ↘ 右下" },
 			new[] { "FPS ↖ 좌상단", "FPS ↗ 우상단", "FPS ↙ 좌하단", "FPS ↘ 우하단" });
 
+		public static string DynamicJoystick => T(
+			"Joystick dinâmico (lado esquerdo)", "Dynamic joystick (left side)", "Joystick dinámico (lado izquierdo)", "ダイナミックジョイスティック（左側）", "Joystick dynamique (côté gauche)", "Joystick dinamico (lato sinistro)", "Dynamischer Joystick (linke Seite)", "Динамический стик (слева)", "动态摇杆（左侧）", "다이내믹 조이스틱 (왼쪽)");
+
 		public static string DirAnalog => T(
 			"Direcional: Analógico", "D-pad: Analog stick", "Direccional: Analógico", "方向: アナログ", "Direction : Joystick", "Direzionale: Analogico", "Steuerung: Analogstick", "Управление: Стик", "方向：摇杆", "방향: 아날로그");
 
@@ -485,6 +488,21 @@ namespace CelesteAndroid
 
 		public static string Opacity => T(
 			"Opacidade", "Opacity", "Opacidad", "不透明度", "Opacité", "Opacità", "Deckkraft", "Непрозрачность", "不透明度", "불투명도");
+
+		public static string TouchTransparency => T(
+			"Transparência dos botões", "Button transparency", "Transparencia de los botones", "ボタンの透明度", "Transparence des boutons", "Trasparenza dei pulsanti", "Transparenz der Tasten", "Прозрачность кнопок", "按钮透明度", "버튼 투명도");
+
+		public static string TouchTransparencyHint => T(
+			"0%: sólidos · 100%: invisíveis. Os botões continuam funcionando. Aplica-se aos controles que usam a opacidade geral.",
+			"0%: solid · 100%: invisible. Buttons still work. Applies to controls using global opacity.",
+			"0%: sólidos · 100%: invisibles. Los botones siguen funcionando. Se aplica a los controles que usan la opacidad general.",
+			"0%: 不透明 · 100%: 非表示。ボタンは引き続き機能します。共通の不透明度を使うコントロールに適用されます。",
+			"0% : opaques · 100% : invisibles. Les boutons restent actifs. S'applique aux commandes utilisant l'opacité globale.",
+			"0%: opachi · 100%: invisibili. I pulsanti funzionano comunque. Si applica ai controlli con opacità globale.",
+			"0%: deckend · 100%: unsichtbar. Die Tasten bleiben aktiv. Gilt für Steuerungen mit globaler Deckkraft.",
+			"0%: непрозрачные · 100%: невидимые. Кнопки продолжают работать. Для элементов с общей непрозрачностью.",
+			"0%：不透明 · 100%：不可见。按钮仍然有效。适用于使用全局不透明度的控件。",
+			"0%: 불투명 · 100%: 보이지 않음. 버튼은 계속 작동합니다. 전체 불투명도를 사용하는 컨트롤에 적용됩니다.");
 
 		public static string Reset => T(
 			"Resetar", "Reset", "Restablecer", "リセット", "Réinitialiser", "Ripristina", "Zurücksetzen", "Сбросить", "重置", "초기화");

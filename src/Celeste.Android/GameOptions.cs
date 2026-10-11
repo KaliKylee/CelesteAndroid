@@ -10,6 +10,11 @@ namespace CelesteAndroid
 
 		public const int DefaultOpacity = 45;
 
+		public static bool DynamicJoystick(ISharedPreferences prefs) => prefs.GetBoolean("dynamic_joystick", false);
+
+		public static void SetDynamicJoystick(ISharedPreferences prefs, bool value) =>
+			prefs.Edit()!.PutBoolean("dynamic_joystick", value)!.Apply();
+
 		public static ISharedPreferences Prefs(Context context) =>
 			context.GetSharedPreferences("launcher", FileCreationMode.Private)!;
 

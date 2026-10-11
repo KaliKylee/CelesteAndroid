@@ -226,11 +226,13 @@ namespace CelesteAndroid
 
 		private void ShowOptionsMenu()
 		{
-			const int EditControlsId = 0, ShowFpsId = 1, HideTouchId = 2;
+			const int EditControlsId = 0, ShowFpsId = 1, HideTouchId = 2, TransparencyId = 3, DynamicJoystickId = 4;
 			var menu = new PopupMenu(this, optionsButton);
 			menu.Menu!.Add(0, EditControlsId, 0, L.EditControls);
 			menu.Menu.Add(0, ShowFpsId, 1, L.ShowFps)!.SetCheckable(true)!.SetChecked(GameOptions.ShowFps(Prefs));
 			menu.Menu.Add(0, HideTouchId, 2, L.HideTouchButtons)!.SetCheckable(true)!.SetChecked(GameOptions.HideTouch(Prefs));
+			menu.Menu.Add(0, TransparencyId, 3, L.TouchTransparency);
+			menu.Menu.Add(0, DynamicJoystickId, 4, L.DynamicJoystick)!.SetCheckable(true)!.SetChecked(GameOptions.DynamicJoystick(Prefs));
 			menu.MenuItemClick += (_, e) =>
 			{
 				switch (e.Item!.ItemId)
@@ -244,11 +246,76 @@ namespace CelesteAndroid
 					case HideTouchId:
 						GameOptions.SetHideTouch(Prefs, !GameOptions.HideTouch(Prefs));
 						break;
+					case DynamicJoystickId:
+						GameOptions.SetDynamicJoystick(Prefs, !GameOptions.DynamicJoystick(Prefs));
+						break;
+					case TransparencyId:
+						ShowTouchTransparency();
+						break;
 				}
 				HideSystemBars();
 			};
 			menu.DismissEvent += (_, _) => HideSystemBars();
 			menu.Show();
+		}
+
+		private void ShowTouchTransparency()
+		{
+			var content = new LinearLayout(this) { Orientation = Orientation.Vertical };
+			content.SetPadding(Dp(24), Dp(12), Dp(24), Dp(12));
+			var value = Text("", 16, Color.White, TypefaceStyle.Normal);
+			content.AddView(value);
+			var slider = new SeekBar(this)
+			{
+				Max = 100,
+				Progress = 100 - GameOptions.Opacity(Prefs),
+				ProgressTintList = Android.Content.Res.ColorStateList.ValueOf(Accent),
+				ThumbTintList = Android.Content.Res.ColorStateList.ValueOf(Accent)
+			};
+			content.AddView(slider, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Dp(48)));
+			content.AddView(Text(L.TouchTransparencyHint, 13, Accent, TypefaceStyle.Normal));
+
+			// Preview the same jump sprite over the launcher art while dragging.
+			var preview = new FrameLayout(this);
+			var backdrop = new ImageView(this);
+			backdrop.SetImageResource(Resource.Drawable.launcher_bg);
+			backdrop.SetScaleType(ImageView.ScaleType.CenterCrop);
+			preview.AddView(backdrop, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+			int n = PixelButtonArt.Size;
+			var bitmap = Bitmap.CreateBitmap(n, n, Bitmap.Config.Argb8888!)!;
+			for (int y = 0; y < n; y++)
+				for (int x = 0; x < n; x++)
+				{
+					int rgb = PixelButtonArt.Jump.ColorOf(PixelButtonArt.Jump.Rows[y][x]);
+					bitmap.SetPixel(x, y, rgb < 0 ? Color.Transparent : Color.Rgb((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255));
+				}
+			var button = new ImageView(this);
+			button.SetImageBitmap(bitmap);
+			preview.AddView(button, new FrameLayout.LayoutParams(Dp(80), Dp(80), GravityFlags.Center));
+			content.AddView(preview, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Dp(100)) { TopMargin = Dp(12) });
+
+			void UpdatePreview()
+			{
+				value.Text = $"{L.TouchTransparency}: {slider.Progress}%";
+				button.Alpha = (100 - slider.Progress) / 100f;
+			}
+			slider.ProgressChanged += (_, _) => UpdatePreview();
+			UpdatePreview();
+			var scroll = new ScrollView(this);
+			scroll.AddView(content);
+			var dialog = new AlertDialog.Builder(this)!
+				.SetTitle(L.TouchTransparency)!
+				.SetView(scroll)!
+				.SetPositiveButton(L.Save, (_, _) => GameOptions.SetOpacity(Prefs, 100 - slider.Progress))!
+				.SetNegativeButton(L.Cancel, (_, _) => { })!
+				.Create()!;
+			dialog.DismissEvent += (_, _) =>
+			{
+				button.SetImageDrawable(null);
+				bitmap.Dispose();
+				HideSystemBars();
+			};
+			dialog.Show();
 		}
 
 		private void LoadArt()
@@ -364,6 +431,7 @@ namespace CelesteAndroid
 				intent.PutExtra(GameActivity.ExtraDriver, GraphicsDriver.OpenGL);
 			intent.PutExtra(GameActivity.ExtraShowFps, GameOptions.ShowFps(Prefs));
 			intent.PutExtra(GameActivity.ExtraHideTouch, GameOptions.HideTouch(Prefs));
+			intent.PutExtra(GameActivity.ExtraDynamicJoystick, GameOptions.DynamicJoystick(Prefs));
 			intent.PutExtra(GameActivity.ExtraTouchOpacity, GameOptions.Opacity(Prefs));
 			StartActivity(intent);
 		}

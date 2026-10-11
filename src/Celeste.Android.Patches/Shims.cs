@@ -15,6 +15,8 @@ namespace CelesteAndroid
 		public const string HideTouchKey = "CelesteAndroid.HideTouch";
 		public const string TouchOpacityKey = "CelesteAndroid.TouchOpacity";
 
+		public static bool DynamicJoystick => AppContext.GetData("CelesteAndroid.DynamicJoystick") as string == "1";
+
 		public static bool ShowFps => AppContext.GetData(ShowFpsKey) as string == "1";
 
 		public static bool HideTouch => AppContext.GetData(HideTouchKey) as string == "1";

@@ -15,7 +15,7 @@ namespace CelesteAndroid
 	public static class TouchControls
 	{
 		public static float Opacity = 0.45f;
-		public static float ButtonOpacity => Math.Clamp(Opacity, 0f, 1f);
+		public static float ButtonOpacity => Opacity <= 0.45f ? Opacity / 0.45f * 0.9f : Math.Min(1f, 0.9f + (Opacity - 0.45f) / 0.55f * 0.1f);
 		public static float ButtonSize = 0.17f;
 		public static float StickRadius = 0.13f;
 		public static float StickDeadZone = 0.18f;
@@ -319,7 +319,7 @@ namespace CelesteAndroid
 			float o = btnOpacity[(int)b];
 			if (o < 0f)
 				return ButtonOpacity;
-			return Math.Clamp(o, 0f, 1f);
+			return o <= 0.45f ? o / 0.45f * 0.9f : Math.Min(1f, 0.9f + (o - 0.45f) / 0.55f * 0.1f);
 		}
 
 		private static void ApplyKeyboard()
@@ -1027,7 +1027,7 @@ namespace CelesteAndroid
 			return customSkin[i];
 		}
 
-		private static float CustomAlpha(CustomBtn c) => c.Opacity < 0f ? ButtonOpacity : Math.Clamp(c.Opacity, 0f, 1f);
+		private static float CustomAlpha(CustomBtn c) => c.Opacity < 0f ? ButtonOpacity : (c.Opacity <= 0.45f ? c.Opacity / 0.45f * 0.9f : Math.Min(1f, 0.9f + (c.Opacity - 0.45f) / 0.55f * 0.1f));
 
 		private static void DrawCustomGlows()
 		{

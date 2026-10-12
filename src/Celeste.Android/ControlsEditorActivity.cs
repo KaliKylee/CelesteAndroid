@@ -1692,8 +1692,14 @@ namespace CelesteAndroid
 			canvas.DrawRoundRect(new RectF(r.Left - pad, r.Top - pad, r.Right + pad, r.Bottom + pad), Dp(6), Dp(6), paint);
 		}
 
-		// Keep a faint preview at zero so invisible controls can still be edited.
-		private float ButtonAlpha => PreviewAlpha;
+		private float ButtonAlpha
+		{
+			get
+			{
+				float o = PreviewAlpha;
+				return o <= 0.45f ? o / 0.45f * 0.9f : Math.Min(1f, 0.9f + (o - 0.45f) / 0.55f * 0.1f);
+			}
+		}
 
 		private int A(float factor) => Math.Clamp((int)Math.Round(PreviewAlpha * factor * 255f), 0, 255);
 
@@ -1822,7 +1828,7 @@ namespace CelesteAndroid
 			if (op < 0)
 				return ButtonAlpha;
 			float o = op / 100f;
-			return Math.Clamp(o, 0f, 1f);
+			return o <= 0.45f ? o / 0.45f * 0.9f : Math.Min(1f, 0.9f + (o - 0.45f) / 0.55f * 0.1f);
 		}
 
 		private Bitmap SkinBitmap(int i, int cols, int rows, int cell)

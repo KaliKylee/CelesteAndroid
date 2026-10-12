@@ -226,11 +226,12 @@ namespace CelesteAndroid
 
 		private void ShowOptionsMenu()
 		{
-			const int EditControlsId = 0, ShowFpsId = 1, HideTouchId = 2;
+			const int EditControlsId = 0, ShowFpsId = 1, HideTouchId = 2, DynamicJoystickId = 3;
 			var menu = new PopupMenu(this, optionsButton);
 			menu.Menu!.Add(0, EditControlsId, 0, L.EditControls);
 			menu.Menu.Add(0, ShowFpsId, 1, L.ShowFps)!.SetCheckable(true)!.SetChecked(GameOptions.ShowFps(Prefs));
 			menu.Menu.Add(0, HideTouchId, 2, L.HideTouchButtons)!.SetCheckable(true)!.SetChecked(GameOptions.HideTouch(Prefs));
+			menu.Menu.Add(0, DynamicJoystickId, 3, L.DynamicJoystick)!.SetCheckable(true)!.SetChecked(GameOptions.DynamicJoystick(Prefs));
 			menu.MenuItemClick += (_, e) =>
 			{
 				switch (e.Item!.ItemId)
@@ -240,6 +241,9 @@ namespace CelesteAndroid
 						break;
 					case ShowFpsId:
 						GameOptions.SetShowFps(Prefs, !GameOptions.ShowFps(Prefs));
+						break;
+					case DynamicJoystickId:
+						GameOptions.SetDynamicJoystick(Prefs, !GameOptions.DynamicJoystick(Prefs));
 						break;
 					case HideTouchId:
 						GameOptions.SetHideTouch(Prefs, !GameOptions.HideTouch(Prefs));
@@ -364,6 +368,7 @@ namespace CelesteAndroid
 				intent.PutExtra(GameActivity.ExtraDriver, GraphicsDriver.OpenGL);
 			intent.PutExtra(GameActivity.ExtraShowFps, GameOptions.ShowFps(Prefs));
 			intent.PutExtra(GameActivity.ExtraHideTouch, GameOptions.HideTouch(Prefs));
+			intent.PutExtra(GameActivity.ExtraDynamicJoystick, GameOptions.DynamicJoystick(Prefs));
 			intent.PutExtra(GameActivity.ExtraTouchOpacity, GameOptions.Opacity(Prefs));
 			StartActivity(intent);
 		}

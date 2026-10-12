@@ -28,6 +28,7 @@ namespace CelesteAndroid
 		public const string ExtraShowFps = "show_fps";
 		public const string ExtraHideTouch = "hide_touch";
 		public const string ExtraTouchOpacity = "touch_opacity";
+		public const string ExtraDynamicJoystick = "dynamic_joystick";
 
 		private const int SurviveMs = 15000, QuickExitMs = 5000;
 		private static System.Threading.Timer? surviveTimer;
@@ -74,6 +75,7 @@ namespace CelesteAndroid
 			if (!string.IsNullOrEmpty(driver))
 				SDL3.SDL.SDL_SetHint("FNA3D_FORCE_DRIVER", driver);
 
+			AppContext.SetData("CelesteAndroid.DynamicJoystick", Intent?.GetBooleanExtra(ExtraDynamicJoystick, false) == true ? "1" : "0");
 			AppContext.SetData("CelesteAndroid.ShowFps", Intent?.GetBooleanExtra(ExtraShowFps, false) == true ? "1" : "0");
 			AppContext.SetData("CelesteAndroid.HideTouch", Intent?.GetBooleanExtra(ExtraHideTouch, false) == true ? "1" : "0");
 			AppContext.SetData("CelesteAndroid.TouchOpacity",

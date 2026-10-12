@@ -477,6 +477,9 @@ namespace CelesteAndroid
 			new[] { "FPS ↖ 左上", "FPS ↗ 右上", "FPS ↙ 左下", "FPS ↘ 右下" },
 			new[] { "FPS ↖ 좌상단", "FPS ↗ 우상단", "FPS ↙ 좌하단", "FPS ↘ 우하단" });
 
+		public static string DynamicJoystick => T(
+			"Joystick dinâmico (lado esquerdo)", "Dynamic joystick (left side)", "Joystick dinámico (lado izquierdo)", "ダイナミックジョイスティック（左側）", "Joystick dynamique (côté gauche)", "Joystick dinamico (lato sinistro)", "Dynamischer Joystick (linke Seite)", "Динамический стик (слева)", "动态摇杆（左侧）", "다이내믹 조이스틱 (왼쪽)");
+
 		public static string DirAnalog => T(
 			"Direcional: Analógico", "D-pad: Analog stick", "Direccional: Analógico", "方向: アナログ", "Direction : Joystick", "Direzionale: Analogico", "Steuerung: Analogstick", "Управление: Стик", "方向：摇杆", "방향: 아날로그");
 

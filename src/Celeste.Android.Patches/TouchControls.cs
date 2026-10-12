@@ -50,6 +50,9 @@ namespace CelesteAndroid
 		private static long lastPollMs = -100;
 
 		private static bool dpadMode; // true = setas direcionais em vez do analógico (layout: dpad=1)
+		private static bool FloatingStick => HostConfig.DynamicJoystick && !dpadMode;
+		private static Vector2 floatingStickBase;
+		private static readonly HashSet<long> previousFingers = new();
 		private static bool stickActive;
 		private static long stickKey;
 		private static Vector2 stickValue;
@@ -441,7 +444,9 @@ namespace CelesteAndroid
 		private static float Unit(Btn b) => BaseUnit * customScale[(int)b];
 		private static float StickRange => screenH * StickRadius * customScale[StickIdx];
 
-		private static Vector2 StickBase => custom[StickIdx]
+		private static Vector2 StickBase => FloatingStick && stickActive ? floatingStickBase : FixedStickBase;
+
+		private static Vector2 FixedStickBase => custom[StickIdx]
 			? new Vector2(customPos[StickIdx].X * screenW, customPos[StickIdx].Y * screenH)
 			: new Vector2(screenH * StickX, screenH * (1f - StickBottom));
 
@@ -524,13 +529,20 @@ namespace CelesteAndroid
 				{
 					customPressed[ci] = true;
 				}
-				else if (!stickActive && Vector2.Distance(f.Pos, StickBase) <= StickRange * StickGrabRadius)
+				else if (!stickActive && (FloatingStick
+					? !previousFingers.Contains(f.Key) && f.Pos.X < screenW * 0.5f
+					: Vector2.Distance(f.Pos, StickBase) <= StickRange * StickGrabRadius))
 				{
+					if (FloatingStick)
+						floatingStickBase = f.Pos;
 					stickActive = true;
 					stickKey = f.Key;
 					UpdateStick(f.Pos);
 				}
 			}
+			previousFingers.Clear();
+			foreach (Finger f in fingers)
+				previousFingers.Add(f.Key);
 		}
 
 		private static void UpdateStick(Vector2 pos)
@@ -662,7 +674,7 @@ namespace CelesteAndroid
 				float range = StickRange;
 				if (dpadMode)
 					DrawDpad(baseCenter, range);
-				else
+				else if (!FloatingStick || stickActive)
 				{
 					Vector2 knob = baseCenter + stickKnob;
 					float a = stickActive ? Opacity * 1.3f : Opacity;

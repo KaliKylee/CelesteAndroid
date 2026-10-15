@@ -46,6 +46,40 @@ namespace CelesteAndroid
 
 		private static readonly List<Finger> fingers = new();
 		private static readonly bool[] pressed = new bool[5];
+		private static readonly bool[] hapticButtons = new bool[17];
+		private static readonly bool[] hapticDirections = new bool[4];
+		private static readonly StickHaptics stickHaptics = new();
+
+		private static void Haptic(int kind)
+		{
+			// The Android host supplies this delegate; desktop hosts simply omit it.
+			if (AppContext.GetData("CelesteAndroid.TouchHaptic") is Action<int> feedback)
+				feedback(kind);
+		}
+
+		private static void UpdateHaptics()
+		{
+			for (int i = 0; i < hapticButtons.Length; i++)
+			{
+				bool down = i < pressed.Length ? pressed[i]
+					: i - pressed.Length < customPressed.Length && customPressed[i - pressed.Length];
+				if (down != hapticButtons[i])
+					Haptic(down ? 1 : 2);
+				hapticButtons[i] = down;
+			}
+			if (dpadMode)
+			{
+				for (int i = 0; i < 4; i++)
+				{
+					bool down = i switch { 0 => stickValue.Y > 0.5f, 1 => stickValue.X > 0.5f,
+						2 => stickValue.Y < -0.5f, _ => stickValue.X < -0.5f };
+					if (down != hapticDirections[i]) Haptic(down ? 1 : 2);
+					hapticDirections[i] = down;
+				}
+			}
+			else if (stickHaptics.Update(stickValue.X, stickValue.Y))
+				Haptic(3);
+		}
 		private static readonly Stopwatch clock = Stopwatch.StartNew();
 		private static long lastPollMs = -100;
 
@@ -368,6 +402,7 @@ namespace CelesteAndroid
 			}
 
 			Resolve();
+			UpdateHaptics();
 			ApplyKeyboard();
 		}
 

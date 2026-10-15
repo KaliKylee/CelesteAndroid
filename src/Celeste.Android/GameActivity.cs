@@ -4,6 +4,7 @@ using Android.App;
 using Android.Content.PM;
 using Android.OS;
 using Android.Util;
+using Android.Views;
 using Microsoft.Xna.Framework;
 using Org.Libsdl.App;
 
@@ -30,6 +31,37 @@ namespace CelesteAndroid
 		public const string ExtraTouchOpacity = "touch_opacity";
 		public const string ExtraDynamicJoystick = "dynamic_joystick";
 
+		private volatile bool hapticsResumed;
+
+		protected override void OnResume()
+		{
+			base.OnResume();
+			hapticsResumed = true;
+		}
+
+		protected override void OnPause()
+		{
+			hapticsResumed = false;
+			base.OnPause();
+		}
+
+		private void TouchHaptic(int kind)
+		{
+			if (!hapticsResumed) return;
+			RunOnUiThread(() =>
+			{
+				if (!hapticsResumed || IsFinishing || IsDestroyed) return;
+				var effect = kind switch
+				{
+					1 => FeedbackConstants.VirtualKey,
+					2 => Build.VERSION.SdkInt >= BuildVersionCodes.OMr1
+						? FeedbackConstants.VirtualKeyRelease : FeedbackConstants.ClockTick,
+					_ => FeedbackConstants.ClockTick,
+				};
+				Window?.DecorView?.PerformHapticFeedback(effect);
+			});
+		}
+
 		private const int SurviveMs = 15000, QuickExitMs = 5000;
 		private static System.Threading.Timer? surviveTimer;
 		private readonly System.Diagnostics.Stopwatch alive = System.Diagnostics.Stopwatch.StartNew();
@@ -52,6 +84,8 @@ namespace CelesteAndroid
 
 		protected override void OnDestroy()
 		{
+			hapticsResumed = false;
+			AppContext.SetData("CelesteAndroid.TouchHaptic", null);
 			Org.Fmod.FMOD.Close();
 			if (alive.ElapsedMilliseconds > QuickExitMs)
 				GraphicsDriver.MarkLaunchOk(this);
@@ -75,6 +109,7 @@ namespace CelesteAndroid
 			if (!string.IsNullOrEmpty(driver))
 				SDL3.SDL.SDL_SetHint("FNA3D_FORCE_DRIVER", driver);
 
+			AppContext.SetData("CelesteAndroid.TouchHaptic", (Action<int>)TouchHaptic);
 			AppContext.SetData("CelesteAndroid.DynamicJoystick", Intent?.GetBooleanExtra(ExtraDynamicJoystick, false) == true ? "1" : "0");
 			AppContext.SetData("CelesteAndroid.ShowFps", Intent?.GetBooleanExtra(ExtraShowFps, false) == true ? "1" : "0");
 			AppContext.SetData("CelesteAndroid.HideTouch", Intent?.GetBooleanExtra(ExtraHideTouch, false) == true ? "1" : "0");

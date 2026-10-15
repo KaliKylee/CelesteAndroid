@@ -32,16 +32,20 @@ namespace CelesteAndroid
 		public const string ExtraDynamicJoystick = "dynamic_joystick";
 
 		private volatile bool hapticsResumed;
+		private TouchVibration? touchVibration;
+		private HapticPolicy vibrationPolicy;
 
 		protected override void OnResume()
 		{
 			base.OnResume();
+			vibrationPolicy = GameOptions.VibrationFromIntent(Intent);
 			hapticsResumed = true;
 		}
 
 		protected override void OnPause()
 		{
 			hapticsResumed = false;
+			touchVibration?.Cancel();
 			base.OnPause();
 		}
 
@@ -51,14 +55,7 @@ namespace CelesteAndroid
 			RunOnUiThread(() =>
 			{
 				if (!hapticsResumed || IsFinishing || IsDestroyed) return;
-				var effect = kind switch
-				{
-					1 => FeedbackConstants.VirtualKey,
-					2 => Build.VERSION.SdkInt >= BuildVersionCodes.OMr1
-						? FeedbackConstants.VirtualKeyRelease : FeedbackConstants.ClockTick,
-					_ => FeedbackConstants.ClockTick,
-				};
-				Window?.DecorView?.PerformHapticFeedback(effect);
+				touchVibration?.Play(kind, vibrationPolicy);
 			});
 		}
 
@@ -79,12 +76,14 @@ namespace CelesteAndroid
 			CultureFix.Apply();
 			RequestedOrientation = LandscapeLock.Orientation;
 			base.OnCreate(savedInstanceState);
+			touchVibration = new TouchVibration(this);
 			Org.Fmod.FMOD.Init(this);
 		}
 
 		protected override void OnDestroy()
 		{
 			hapticsResumed = false;
+			touchVibration?.Cancel();
 			AppContext.SetData("CelesteAndroid.TouchHaptic", null);
 			Org.Fmod.FMOD.Close();
 			if (alive.ElapsedMilliseconds > QuickExitMs)

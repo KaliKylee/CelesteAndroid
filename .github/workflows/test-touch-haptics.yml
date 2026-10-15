@@ -9,7 +9,7 @@ on:
       - '.github/workflows/test-touch-haptics.yml'
       - 'src/Celeste.Android.Patches/StickHaptics.cs'
       - 'src/Celeste.Android.Patches/TouchControls.cs'
-      - 'src/Celeste.Android/GameActivity.cs'
+      - 'src/Celeste.Android/**'
       - 'tests/TouchHaptics/**'
 
 permissions:

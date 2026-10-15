@@ -951,6 +951,151 @@ namespace CelesteAndroid
 			"正在为 Android 适配游戏…",
 			"Android용으로 게임을 조정하는 중…");
 
+		public static string Vibration => T(
+			"Vibração",
+			"Vibration",
+			"Vibración",
+			"振動",
+			"Vibrations",
+			"Vibrazione",
+			"Vibration",
+			"Вибрация",
+			"振动",
+			"진동");
+
+		public static string VibrationEnabled => T(
+			"Ativar vibração",
+			"Enable vibration",
+			"Activar vibración",
+			"振動を有効にする",
+			"Activer les vibrations",
+			"Attiva vibrazione",
+			"Vibration aktivieren",
+			"Включить вибрацию",
+			"启用振动",
+			"진동 켜기");
+
+		public static string VibrationWhen => T(
+			"Vibrar nos botões",
+			"Vibrate on buttons",
+			"Vibrar en los botones",
+			"ボタンの振動タイミング",
+			"Vibrations des boutons",
+			"Vibrazione dei pulsanti",
+			"Tastenvibration",
+			"Вибрация кнопок",
+			"按钮振动时机",
+			"버튼 진동 시점");
+
+		public static string VibrationBoth => T(
+			"Ao tocar e soltar",
+			"On press and release",
+			"Al tocar y soltar",
+			"押したときと離したとき",
+			"À l’appui et au relâchement",
+			"Alla pressione e al rilascio",
+			"Beim Drücken und Loslassen",
+			"При нажатии и отпускании",
+			"按下和松开时",
+			"누를 때와 뗄 때");
+
+		public static string VibrationPress => T(
+			"Somente ao tocar",
+			"On press only",
+			"Solo al tocar",
+			"押したときのみ",
+			"À l’appui uniquement",
+			"Solo alla pressione",
+			"Nur beim Drücken",
+			"Только при нажатии",
+			"仅按下时",
+			"누를 때만");
+
+		public static string VibrationRelease => T(
+			"Somente ao soltar",
+			"On release only",
+			"Solo al soltar",
+			"離したときのみ",
+			"Au relâchement uniquement",
+			"Solo al rilascio",
+			"Nur beim Loslassen",
+			"Только при отпускании",
+			"仅松开时",
+			"뗄 때만");
+
+		public static string VibrationIntensity => T(
+			"Intensidade",
+			"Intensity",
+			"Intensidad",
+			"強さ",
+			"Intensité",
+			"Intensità",
+			"Stärke",
+			"Интенсивность",
+			"强度",
+			"강도");
+
+		public static string VibrationJoystick => T(
+			"Joystick: pulsos a cada 45°",
+			"Joystick: ticks every 45°",
+			"Joystick: pulsos cada 45°",
+			"スティック：45°ごとに振動",
+			"Joystick : impulsions tous les 45°",
+			"Joystick: impulsi ogni 45°",
+			"Joystick: Impulse alle 45°",
+			"Стик: импульсы каждые 45°",
+			"摇杆：每45°振动",
+			"조이스틱: 45°마다 진동");
+
+		public static string VibrationTest => T(
+			"Toque e solte para testar",
+			"Press and release to test",
+			"Toca y suelta para probar",
+			"押して離してテスト",
+			"Appuyez et relâchez pour tester",
+			"Premi e rilascia per provare",
+			"Zum Testen drücken und loslassen",
+			"Нажмите и отпустите для проверки",
+			"按下并松开以测试",
+			"누르고 떼어 테스트");
+
+		public static string VibrationHint => T(
+			"Respeita a vibração tátil do Android. 0% silencia todos os pulsos.",
+			"Respects Android touch-feedback settings. 0% silences all pulses.",
+			"Respeta la respuesta táctil de Android. 0% silencia todos los pulsos.",
+			"Androidの触覚設定に従います。0%ですべての振動が止まります。",
+			"Respecte les réglages tactiles Android. 0 % désactive toutes les impulsions.",
+			"Rispetta le impostazioni tattili Android. 0% silenzia tutti gli impulsi.",
+			"Beachtet Android-Tastvibration. 0 % schaltet alle Impulse stumm.",
+			"Учитывает настройки отклика Android. 0% отключает все импульсы.",
+			"遵循Android触感设置。0%关闭所有振动。",
+			"Android 터치 피드백 설정을 따릅니다. 0%는 모든 진동을 끕니다.");
+
+		public static string VibrationDurationHint => T(
+			"Este aparelho ajusta a duração dos pulsos em vez da amplitude. Respeita a vibração tátil do Android.",
+			"This device adjusts pulse duration instead of amplitude. Respects Android touch-feedback settings.",
+			"Este dispositivo ajusta la duración de los pulsos en lugar de la amplitud. Respeta la respuesta táctil de Android.",
+			"この端末では振幅の代わりに振動の長さを調整します。Androidの触覚設定に従います。",
+			"Cet appareil ajuste la durée des impulsions plutôt que leur amplitude. Respecte les réglages tactiles Android.",
+			"Questo dispositivo regola la durata degli impulsi anziché l’ampiezza. Rispetta le impostazioni tattili Android.",
+			"Dieses Gerät passt die Impulsdauer statt der Amplitude an. Beachtet die Android-Tastvibration.",
+			"Это устройство регулирует длительность импульсов вместо амплитуды. Учитывает настройки отклика Android.",
+			"此设备通过调整振动时长控制强度，并遵循Android触感设置。",
+			"이 기기는 진폭 대신 진동 시간을 조절합니다. Android 터치 피드백 설정을 따릅니다.");
+
+		public static string VibrationUnavailable => T(
+			"Este aparelho não tem motor de vibração.",
+			"This device has no vibration motor.",
+			"Este dispositivo no tiene motor de vibración.",
+			"この端末には振動モーターがありません。",
+			"Cet appareil ne possède pas de moteur de vibration.",
+			"Questo dispositivo non ha un motore di vibrazione.",
+			"Dieses Gerät hat keinen Vibrationsmotor.",
+			"На этом устройстве нет вибромотора.",
+			"此设备没有振动马达。",
+			"이 기기에는 진동 모터가 없습니다.");
+
+
 		public static string MakingBackground => T(
 			"Gerando o fundo…",
 			"Generating the background…",

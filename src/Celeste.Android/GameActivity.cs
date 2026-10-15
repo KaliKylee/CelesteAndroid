@@ -4,6 +4,7 @@ using Android.App;
 using Android.Content.PM;
 using Android.OS;
 using Android.Util;
+using Android.Views;
 using Microsoft.Xna.Framework;
 using Org.Libsdl.App;
 
@@ -30,6 +31,34 @@ namespace CelesteAndroid
 		public const string ExtraTouchOpacity = "touch_opacity";
 		public const string ExtraDynamicJoystick = "dynamic_joystick";
 
+		private volatile bool hapticsResumed;
+		private TouchVibration? touchVibration;
+		private HapticPolicy vibrationPolicy;
+
+		protected override void OnResume()
+		{
+			base.OnResume();
+			vibrationPolicy = GameOptions.VibrationFromIntent(Intent);
+			hapticsResumed = true;
+		}
+
+		protected override void OnPause()
+		{
+			hapticsResumed = false;
+			touchVibration?.Cancel();
+			base.OnPause();
+		}
+
+		private void TouchHaptic(int kind)
+		{
+			if (!hapticsResumed) return;
+			RunOnUiThread(() =>
+			{
+				if (!hapticsResumed || IsFinishing || IsDestroyed) return;
+				touchVibration?.Play(kind, vibrationPolicy);
+			});
+		}
+
 		private const int SurviveMs = 15000, QuickExitMs = 5000;
 		private static System.Threading.Timer? surviveTimer;
 		private readonly System.Diagnostics.Stopwatch alive = System.Diagnostics.Stopwatch.StartNew();
@@ -47,11 +76,15 @@ namespace CelesteAndroid
 			CultureFix.Apply();
 			RequestedOrientation = LandscapeLock.Orientation;
 			base.OnCreate(savedInstanceState);
+			touchVibration = new TouchVibration(this);
 			Org.Fmod.FMOD.Init(this);
 		}
 
 		protected override void OnDestroy()
 		{
+			hapticsResumed = false;
+			touchVibration?.Cancel();
+			AppContext.SetData("CelesteAndroid.TouchHaptic", null);
 			Org.Fmod.FMOD.Close();
 			if (alive.ElapsedMilliseconds > QuickExitMs)
 				GraphicsDriver.MarkLaunchOk(this);
@@ -75,6 +108,7 @@ namespace CelesteAndroid
 			if (!string.IsNullOrEmpty(driver))
 				SDL3.SDL.SDL_SetHint("FNA3D_FORCE_DRIVER", driver);
 
+			AppContext.SetData("CelesteAndroid.TouchHaptic", (Action<int>)TouchHaptic);
 			AppContext.SetData("CelesteAndroid.DynamicJoystick", Intent?.GetBooleanExtra(ExtraDynamicJoystick, false) == true ? "1" : "0");
 			AppContext.SetData("CelesteAndroid.ShowFps", Intent?.GetBooleanExtra(ExtraShowFps, false) == true ? "1" : "0");
 			AppContext.SetData("CelesteAndroid.HideTouch", Intent?.GetBooleanExtra(ExtraHideTouch, false) == true ? "1" : "0");
